@@ -6,4 +6,3 @@ python run_mot17_val.py --seq MOT17-10 --fps 30 --wx 5.0 --wy 5.0 --a 60 --cdt 1
 python run_mot17_val.py --seq MOT17-11 --fps 30 --wx 5.0 --wy 5.0 --a 40 --cdt 10   --hp --cmc
 python run_mot17_val.py --seq MOT17-13 --fps 25 --wx 5.0 --wy 5.0 --a 40 --cdt 10   --hp --cmc
 python eval_mot17.py
-pause

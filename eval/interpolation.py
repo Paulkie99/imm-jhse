@@ -24,7 +24,7 @@ def write_results_score(filename, results):
 def dti(txt_path, save_path, n_min=25, n_dti=20):
     seq_txts = sorted(glob.glob(os.path.join(txt_path, '*.txt')))
     for seq_txt in seq_txts:
-        seq_name = seq_txt.split('\\')[-1]
+        seq_name = seq_txt.split(os.sep)[-1]
         seq_data = np.loadtxt(seq_txt, dtype=np.float64, delimiter=',')
         min_id = int(np.min(seq_data[:, 1]))
         max_id = int(np.max(seq_data[:, 1]))
@@ -72,8 +72,9 @@ def dti(txt_path, save_path, n_min=25, n_dti=20):
         save_seq_txt = os.path.join(save_path, seq_name)
         seq_results = seq_results[1:]
         seq_results = seq_results[seq_results[:, 0].argsort()]
+        # write_results_score(save_path, seq_results)
+        print(save_seq_txt)
         write_results_score(save_seq_txt, seq_results)
-
         # save_dti_txt = os.path.join(save_path, "dti.txt")
         # dti_results = dti_results[1:]
         # dti_results = dti_results[dti_results[:, 0].argsort()]
