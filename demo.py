@@ -1,11 +1,11 @@
 from ultralytics import YOLO
 import os,cv2
 import argparse
-
+from util import gmc
 from tracker.ucmc import UCMCTrack
 from detector.mapper import Mapper
 import numpy as np
-
+import scipy
 
 # 定义一个Detection类，包含id,bb_left,bb_top,bb_width,bb_height,conf,det_class
 class Detection:
@@ -22,6 +22,8 @@ class Detection:
         self.y = np.zeros((2, 1))
         self.R = np.eye(4)
 
+    def get_box(self):
+        return [self.bb_left, self.bb_top, self.bb_width, self.bb_height]
 
     def __str__(self):
         return 'd{}, bb_box:[{},{},{},{}], conf={:.2f}, class{}, uv:[{:.0f},{:.0f}], mapped to:[{:.1f},{:.1f}]'.format(
@@ -94,14 +96,16 @@ def main(args):
     video_out = cv2.VideoWriter('output/output.mp4', cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))  
 
     # 打开一个cv的窗口，指定高度和宽度
-    cv2.namedWindow("demo", cv2.WINDOW_NORMAL)
-    cv2.resizeWindow("demo", width, height)
+    # cv2.namedWindow("demo", cv2.WINDOW_NORMAL)
+    # cv2.resizeWindow("demo", width, height)
 
     detector = Detector()
     detector.load(args.cam_para)
 
     
-    tracker = UCMCTrack(args.a, args.a, args.wx, args.wy, args.vmax, args.cdt, fps, "MOT", args.high_score,False,None)
+    tracker = UCMCTrack(args.a, args.a, args.wx, args.wy, args.vmax, args.cdt, fps, "MOT", args.high_score,False,detector)
+
+    warper = gmc.GMC()
 
     # 循环读取视频帧
     frame_id = 1
@@ -109,9 +113,10 @@ def main(args):
         ret, frame_img = cap.read()
         if not ret:  
             break
-    
+        frame_affine = warper.apply(frame_img)
+        detector.mapper.predict(frame_affine)
         dets = detector.get_dets(frame_img,args.conf_thresh,class_list)
-        tracker.update(dets,frame_id)
+        tracker.update(dets,frame_id,frame_affine)
 
         for det in dets:
             # 画出检测框
@@ -124,8 +129,8 @@ def main(args):
 
 
         # 显示当前帧
-        cv2.imshow("demo", frame_img)
-        cv2.waitKey(1)
+        # cv2.imshow("demo", frame_img)
+        # cv2.waitKey(1)
 
         video_out.write(frame_img)
     
@@ -138,10 +143,10 @@ def main(args):
 parser = argparse.ArgumentParser(description='Process some arguments.')
 parser.add_argument('--video', type=str, default = "demo/demo.mp4", help='video file name')
 parser.add_argument('--cam_para', type=str, default = "demo/cam_para.txt", help='camera parameter file name')
-parser.add_argument('--wx', type=float, default=5, help='wx')
-parser.add_argument('--wy', type=float, default=5, help='wy')
-parser.add_argument('--vmax', type=float, default=10, help='vmax')
-parser.add_argument('--a', type=float, default=100.0, help='assignment threshold')
+parser.add_argument('--wx', type=float, default=3, help='wx')
+parser.add_argument('--wy', type=float, default=3, help='wy')
+parser.add_argument('--vmax', type=float, default=33, help='vmax')
+parser.add_argument('--a', type=float, default=7.0, help='assignment threshold')
 parser.add_argument('--cdt', type=float, default=10.0, help='coasted deletion time')
 parser.add_argument('--high_score', type=float, default=0.5, help='high score threshold')
 parser.add_argument('--conf_thresh', type=float, default=0.01, help='detection confidence threshold')

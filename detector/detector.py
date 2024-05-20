@@ -12,6 +12,8 @@ class Detection:
         self.bb_top = bb_top
         self.bb_width = bb_width
         self.bb_height = bb_height
+        self.foot_x = self.bb_left + self.bb_width / 2
+        self.foot_y = self.bb_top + self.bb_height
         self.conf = conf
         self.det_class = det_class
         self.track_id = 0
@@ -64,6 +66,8 @@ class Detector:
                 det.bb_top = float(line[3])
                 det.bb_width = float(line[4])
                 det.bb_height = float(line[5])
+                det.foot_x = det.bb_left + det.bb_width / 2
+                det.foot_y = det.bb_top + det.bb_height
                 det.conf = float(line[6])
                 det.det_class = int(line[7])
                 if det.det_class == -1:
@@ -89,9 +93,10 @@ class Detector:
     def get_dets(self, frame_id,conf_thresh = 0,det_class = 0):
         dets = self.dets[frame_id]
         dets = [det for det in dets if det.det_class == det_class and det.conf >= conf_thresh]
-        return dets
-    
 
+        for det in dets:
+            det.y,det.R = self.mapper.mapto([det.bb_left,det.bb_top,det.bb_width,det.bb_height])
+        return dets
 
     def cmc(self,x,y,w,h,frame_id):
         u,v = self.mapper.xy2uv(x,y)
