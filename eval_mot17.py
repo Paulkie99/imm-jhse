@@ -13,7 +13,7 @@ seqmap = os.path.join(out_path,exp_name, "val_seqmap.txt")
 with open(seqmap,"w") as f:
     f.write("name\n")
     for file in glob.glob(os.path.join(out_path, exp_name, "*txt")):
-        if "seqmap" in file:
+        if "MOT" not in file:
             continue
         f.write(f"{file.split(os.sep)[-1].split('.')[0]}\n")
 

@@ -1,5 +1,6 @@
 import warnings
 from filterpy.kalman import KalmanFilter
+from matplotlib.pylab import LinAlgError
 import numpy as np
 from enum import Enum
 import scipy
@@ -23,6 +24,7 @@ class KalmanTracker(object):
         self.kf.R = R
         self.kf.P = np.zeros((4, 4))
         np.fill_diagonal(self.kf.P, np.array([1, (vmax / 3)**2, 1,  (vmax / 3)**2]))
+        # np.fill_diagonal(self.kf.P, np.array([1, vmax**2/3.0, 1,  vmax**2/3.0]))
         self.kf.P[[0, 2], 0] = (1 * R)[:, 0]
         self.kf.P[[0, 2], 2] = (1 * R)[:, 1]
         self.kf.P = scipy.linalg.block_diag(*(self.kf.P, H_P))
@@ -57,13 +59,28 @@ class KalmanTracker(object):
     # def update(self, y, R):
     #     self.kf.update(y,R)
 
-    def predict(self, affine):
-        self.kf.F = scipy.linalg.block_diag(*(self.motion_transition_mat, scipy.linalg.block_diag(
+    def predict_homog(self, affine):
+        self.kf.F = scipy.linalg.block_diag(*(np.eye(4), 
+                                              
+                                              scipy.linalg.block_diag(
             np.kron(np.eye(2), np.r_[affine, [[0, 0, 1]]]),
             affine[:2, :2],
-        )))
+        )
+                                              ))
         self.kf.predict()
         self.kf.x[-2:, 0] += affine[:2, -1]
+
+
+    def predict(self, affine):
+        self.kf.F = scipy.linalg.block_diag(*(self.motion_transition_mat, 
+                                              scipy.linalg.block_diag(
+            np.kron(np.eye(2), np.r_[affine, [[0, 0, 1]]]),
+            affine[:2, :2],
+        )
+                                              ))
+        self.kf.predict()
+        self.kf.x[-2:, 0] += affine[:2, -1]
+
         self.age += 1
         return np.dot(self.kf.H, self.kf.x)
 
@@ -101,15 +118,18 @@ class KalmanTracker(object):
         # try:
         #     logdet = np.linalg.det(S)
         #     logdet = np.log(logdet)
-        # except RuntimeWarning:
+        # except (RuntimeWarning, LinAlgError):
         #     logdet = 1000
-        # return mahalanobis[0,0] + logdet
+        # return mahalanobis[0,0] #+ logdet
 
         diff = y - np.dot(self.kf.H, self.kf.x)
         S = np.dot(self.kf.H, np.dot(self.kf.P,self.kf.H.T)) + R
         SI = np.linalg.inv(S)
         mahalanobis = np.dot(diff.T,np.dot(SI,diff))
-        logdet = np.log(np.linalg.det(S))
+        try:
+            logdet = np.log(np.linalg.det(S))
+        except (LinAlgError, RuntimeWarning):
+            logdet = 1000
         return mahalanobis[0,0] + logdet
     
     def update_homography(self, homog, homog_cov):
@@ -122,5 +142,6 @@ class KalmanTracker(object):
 
         kalman_gain = self.kf.P @ update_mat.T @ np.linalg.inv(proj_cov)
 
+        # print(np.isclose(self.kf.x[:4], (self.kf.x + kalman_gain @ (homog[:, None] - proj))[:4]).all())
         self.kf.x = self.kf.x + kalman_gain @ (homog[:, None] - proj)
         self.kf.P = (np.eye(self.kf.P.shape[0]) - kalman_gain @ update_mat) @ self.kf.P

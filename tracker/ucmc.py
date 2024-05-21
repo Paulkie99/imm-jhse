@@ -43,30 +43,29 @@ class UCMCTrack(object):
         self.detector = detector
 
 
-    def update(self, dets,frame_id,frame_affine):        
+    def update(self, dets,frame_id,frame_affine): 
+        for track in self.trackers:
+            track.predict(frame_affine)
+                   
         for track in self.trackers:
             track.update_homography(self.detector.mapper.A.T.flatten()[:-1], self.detector.mapper.covariance)
 
         self.data_association(dets,frame_id,frame_affine)
         
         self.associate_tentative(dets)
-        
-        associated_tracks = []
-        associated_dets = []
-        missing_tracks = []
 
+        any_associated = False
         for track in self.trackers: 
             if track.death_count == 0:
-                associated_tracks.append(track)
-                associated_dets.append(dets[track.detidx])
-            else:
-                missing_tracks.append(track)
+                any_associated = True
+                break
         
-        if len(associated_tracks):
-            self.detector.mapper.update(associated_tracks, associated_dets)
+        if any_associated:
+            # self.detector.mapper.update(associated_tracks, associated_dets)
+            self.detector.mapper.update(self.trackers, dets)
 
-        for track in missing_tracks:
-            track.update_homography(self.detector.mapper.A.T.flatten()[:-1], self.detector.mapper.covariance)
+        # for track in missing_tracks:
+        #     track.update_homography(self.detector.mapper.A.T.flatten()[:-1], self.detector.mapper.covariance)
 
         self.initial_tentative(dets, self.detector.mapper.A.T.flatten()[:-1], self.detector.mapper.covariance,
                                self.detector.mapper.process_covariance)
@@ -86,8 +85,8 @@ class UCMCTrack(object):
                 detidx_low.append(i)
 
         # Predcit new locations of tracks
-        for track in self.trackers:
-            track.predict(frame_affine)
+        # for track in self.trackers:
+        #     track.predict()
             # if self.use_cmc:
             #     x,y = self.detector.cmc(track.kf.x[0,0],track.kf.x[2,0],track.w,track.h,frame_id)
             #     track.kf.x[0,0] = x
@@ -129,6 +128,7 @@ class UCMCTrack(object):
                 #                              self.trackers[trk_idx].kf.x, self.trackers[trk_idx].kf.P)
                 self.trackers[trk_idx].death_count = 0
                 self.trackers[trk_idx].detidx = det_idx
+                self.trackers[trk_idx].R = dets[det_idx].R
                 self.trackers[trk_idx].status = TrackStatus.Confirmed
                 dets[det_idx].track_id = self.trackers[trk_idx].id
 
@@ -166,6 +166,7 @@ class UCMCTrack(object):
                 #                              self.trackers[trk_idx].kf.x, self.trackers[trk_idx].kf.P)
                 self.trackers[trk_idx].death_count = 0
                 self.trackers[trk_idx].detidx = det_idx
+                self.trackers[trk_idx].R = dets[det_idx].R
                 self.trackers[trk_idx].status = TrackStatus.Confirmed
                 dets[det_idx].track_id = self.trackers[trk_idx].id
 
@@ -194,6 +195,7 @@ class UCMCTrack(object):
             self.trackers[trk_idx].death_count = 0
             self.trackers[trk_idx].birth_count += 1
             self.trackers[trk_idx].detidx = det_idx
+            self.trackers[trk_idx].R = dets[det_idx].R
             dets[det_idx].track_id = self.trackers[trk_idx].id
             if self.trackers[trk_idx].birth_count >= 2:
                 self.trackers[trk_idx].birth_count = 0

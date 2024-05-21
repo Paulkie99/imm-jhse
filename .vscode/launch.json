@@ -11,7 +11,20 @@
             "program": "run_mot17_val.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
-            "justMyCode": true
+            "justMyCode": true,
+            "python": "/home/sparta-guestuser/miniconda3/envs/mamba/bin/python",
+            "args": ["--seq", "MOT17-02", "--fps", "30", "--wx", "0.1", "--wy", "0.2", "--a", "10", "--cdt", "30", "--hp", "--cmc"]
+        },
+        {
+            "name": "Debug Demo",
+            "type": "python",
+            "request": "launch",
+            "program": "demo.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "justMyCode": true,
+            "python": "/home/sparta-guestuser/miniconda3/envs/mamba/bin/python",
+            "args": ["--cam_para", "demo/cam_para.txt", "--video", "demo/demo.mp4"]
         }
     ]
 }
