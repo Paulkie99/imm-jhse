@@ -300,7 +300,7 @@ class Mapper(object):
                                   ])  # du/dA
         dX_dA = dX_dU @ dU_dA
 
-        sigma_xy = np.dot(np.dot(dX_dU, sigma_uv), dX_dU.T) #+ np.dot(np.dot(dX_dA, self.covariance), dX_dA.T)
+        sigma_xy = np.dot(np.dot(dX_dU, sigma_uv), dX_dU.T) + np.dot(np.dot(dX_dA, self.covariance), dX_dA.T)
         return xy, sigma_xy
     
     def xy2uv(self,x,y):

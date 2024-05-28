@@ -17,8 +17,8 @@ class Detection:
         self.conf = conf
         self.det_class = det_class
         self.track_id = 0
-        self.y = np.zeros((2, 1))
-        self.R = np.eye(4)
+        # self.y = np.zeros((2, 1))
+        # self.R = np.eye(4)
 
     def get_box(self):
         return [self.bb_left, self.bb_top, self.bb_width, self.bb_height]
@@ -80,7 +80,7 @@ class Detector:
                         noise_z = -0.5/180.0*np.pi
                     self.mapper.disturb_campara(noise_z)
 
-                det.y,det.R = self.mapper.mapto([det.bb_left,det.bb_top,det.bb_width,det.bb_height])
+                # det.y,det.R = self.mapper.mapto([det.bb_left,det.bb_top,det.bb_width,det.bb_height])
                 
                 if self.add_noise:
                     self.mapper.reset_campara()
@@ -94,8 +94,8 @@ class Detector:
         dets = self.dets[frame_id]
         dets = [det for det in dets if det.det_class == det_class and det.conf >= conf_thresh]
 
-        for det in dets:
-            det.y,det.R = self.mapper.mapto([det.bb_left,det.bb_top,det.bb_width,det.bb_height])
+        # for det in dets:
+        #     det.y,det.R = self.mapper.mapto([det.bb_left,det.bb_top,det.bb_width,det.bb_height])
         return dets
 
     def cmc(self,x,y,w,h,frame_id):

@@ -40,6 +40,8 @@ def make_args():
     parser.add_argument('--u_max', type=float, default=13, help='assignment threshold')
     parser.add_argument('--v_max', type=float, default=10, help='assignment threshold')
     parser.add_argument("--add_cam_noise", action="store_true", help="add noise to camera parameter.")
+    parser.add_argument("--P", type=float, default=1)
+    
     args = parser.parse_args()
 
 
@@ -105,7 +107,6 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
     with open(result_file,"w") as f:
         for frame_id in range(1, detector.seq_length + 1):
             frame_affine = detector.gmc.get_affine(frame_id)
-            detector.mapper.predict(frame_affine)
             dets = detector.get_dets(frame_id, conf_thresh)
             tracker.update(dets,frame_id,frame_affine)
             if args.hp:

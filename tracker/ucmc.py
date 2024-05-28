@@ -47,25 +47,12 @@ class UCMCTrack(object):
         for track in self.trackers:
             track.predict(frame_affine)
                    
-        for track in self.trackers:
-            track.update_homography(self.detector.mapper.A.T.flatten()[:-1], self.detector.mapper.covariance)
-
         self.data_association(dets,frame_id,frame_affine)
         
         self.associate_tentative(dets)
 
-        any_associated = False
-        for track in self.trackers: 
-            if track.death_count == 0:
-                any_associated = True
-                break
-        
-        if any_associated:
-            # self.detector.mapper.update(associated_tracks, associated_dets)
-            self.detector.mapper.update(self.trackers, dets)
-
-        # for track in missing_tracks:
-        #     track.update_homography(self.detector.mapper.A.T.flatten()[:-1], self.detector.mapper.covariance)
+        self.detector.mapper.predict(frame_affine)
+        self.detector.mapper.update(self.trackers, dets)
 
         self.initial_tentative(dets, self.detector.mapper.A.T.flatten()[:-1], self.detector.mapper.covariance,
                                self.detector.mapper.process_covariance)
