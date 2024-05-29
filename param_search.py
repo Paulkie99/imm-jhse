@@ -62,7 +62,7 @@ def run_param_search(x,
                         dataset = "MOT17"):
     
     print(f"params: {x}")
-    wx, wy, a, process_cov_alpha = x
+    wx, wy, a, process_cov_alpha, vmax = x
 
     if os.path.exists(out_path):
         shutil.rmtree(out_path)
@@ -92,14 +92,14 @@ def run_param_search(x,
     f_height=1080
 
     detector = Detector(args.add_cam_noise)
-    detector.load(wx,wy,1.0/args.fps,f_width,f_height,cam_para, det_file,gmc_file,process_cov_alpha)
+    detector.load(cam_para, det_file,gmc_file,process_cov_alpha)
     print(f"seq_length = {detector.seq_length}")
 
     a1 = a
     a2 = a
     high_score = args.high_score
     fps = args.fps
-    vmax = args.vmax
+    # vmax = args.vmax
     cdt = args.cdt
     conf_thresh = args.conf_thresh
 
@@ -120,26 +120,29 @@ def run_param_search(x,
                 return 0
             if args.hp:
                 for i in tracker.tentative_idx:
-                    if(detector.mapper.detidxs[i] < 0 or detector.mapper.detidxs[i] >= len(dets)):
+                    t = tracker.trackers[i]
+                    if(t.detidx < 0 or t.detidx >= len(dets)):
                         continue
-                    if i + 1 not in tracklets:
-                        tracklets[i + 1] = Tracklet(frame_id, dets[detector.mapper.detidxs[i]].get_box())
+                    if t.id not in tracklets:
+                        tracklets[t.id] = Tracklet(frame_id, dets[t.detidx].get_box())
                     else:
-                        tracklets[i + 1].add_box(frame_id, dets[detector.mapper.detidxs[i]].get_box())
+                        tracklets[t.id].add_box(frame_id, dets[t.detidx].get_box())
                 for i in tracker.confirmed_idx:
-                    if(detector.mapper.detidxs[i] < 0 or detector.mapper.detidxs[i] >= len(dets)):
+                    t = tracker.trackers[i]
+                    if(t.detidx < 0 or t.detidx >= len(dets)):
                         continue
-                    if i + 1 not in tracklets:
-                        tracklets[i + 1] = Tracklet(frame_id, dets[detector.mapper.detidxs[i]].get_box())
+                    if t.id not in tracklets:
+                        tracklets[t.id] = Tracklet(frame_id, dets[t.detidx].get_box())
                     else:
-                        tracklets[i + 1].add_box(frame_id, dets[detector.mapper.detidxs[i]].get_box())
-                    tracklets[i + 1].activate()
+                        tracklets[t.id].add_box(frame_id, dets[t.detidx].get_box())
+                    tracklets[t.id].activate()
             else:
                 for i in tracker.confirmed_idx:
-                    if(detector.mapper.detidxs[i] < 0 or detector.mapper.detidxs[i] >= len(dets)):
+                    t = tracker.trackers[i] 
+                    if(t.detidx < 0 or t.detidx >= len(dets)):
                         continue
-                    d = dets[detector.mapper.detidxs[i]]
-                    f.write(f"{frame_id},{i + 1},{d.bb_left:.1f},{d.bb_top:.1f},{d.bb_width:.1f},{d.bb_height:.1f},{d.conf:.2f},-1,-1,-1\n")
+                    d = dets[t.detidx]
+                    f.write(f"{frame_id},{t.id},{d.bb_left:.1f},{d.bb_top:.1f},{d.bb_width:.1f},{d.bb_height:.1f},{d.conf:.2f},-1,-1,-1\n")
 
         if args.hp:
             for frame_id in range(1, detector.seq_length + 1):
@@ -148,8 +151,11 @@ def run_param_search(x,
                         if frame_id in tracklets[id].boxes:
                             box = tracklets[id].boxes[frame_id]
                             f.write(f"{frame_id},{id},{box[0]:.1f},{box[1]:.1f},{box[2]:.1f},{box[3]:.1f},-1,-1,-1,-1\n")
-
-    interpolate(orig_save_path, eval_path, n_min=3, n_dti=cdt, is_enable = True)
+    try:
+        interpolate(orig_save_path, eval_path, n_min=3, n_dti=cdt, is_enable = True)
+    except Exception as e:
+        print(e)
+        return 0
     print(f"Time cost: {time.time() - t1:.2f}s")
 
     return eval_HOTA()
@@ -179,19 +185,27 @@ if __name__ == '__main__':
     obj = [
         obj_func
     ]
-    n_var = 4
+    n_var = 5
 
     # vars
-    # wx, wy, a, process_cov_alpha, meas_cov_alpha, sigma_m
+    # wx, wy, a, process_cov_alpha, vmax
     problem = FunctionalProblem(
         n_var,
         obj,
-        xl=np.array([0.1, 0.2, 1,  0]),
-        xu=np.array([5,   5,   100,1])
+        xl=np.array([0.001, 0.001, 1,  0, 0.001]),
+        xu=np.array([5,     5,     100,1, 3])
     )
+    # problem = FunctionalProblem(
+    #     n_var,
+    #     obj,
+    #     xl=np.array([1,  0]),
+    #     xu=np.array([100,1])
+    # )
 
-    algorithm = PatternSearch(x0=np.array([args.wx, args.wy, args.a, args.P]),
+    algorithm = PatternSearch(x0=np.array([args.wx, args.wy, args.a, args.P, args.vmax]),
                               init_delta=0.5)
+    # algorithm = PatternSearch(x0=np.array([args.a, args.P]),
+    #                           init_delta=0.5)
 
     # algorithm = RNSGA3(
     #                     ref_points=np.array([[args.wx, args.wy, args.vmax, args.a, args.cdt, args.conf_thresh, 0.5]]).T,
@@ -213,8 +227,7 @@ if __name__ == '__main__':
             self.F.set(algorithm.pop.get("F"))
 
     res = minimize(problem, algorithm, 
-                   get_termination("n_eval", 100),
+                   get_termination("n_eval", 300),
                    output=MyOutput(),
                    verbose=True, seed=1)
-    print(f"Best solution: \nwx={res.X[0]}\nwy={res.X[1]}\na={res.X[2]}\nP={res.X[3]}\nsigma_m={res.X[4]}\nOBJ={res.F}")
-    # print(f"Best solution: \nwx={res.X[0]}\nwy={res.X[1]}\nvmax={res.X[2]}\na={res.X[3]}\ncdt={res.X[4]}\nconf_thresh={res.X[5]}\nP={res.X[6]}\nR={res.X[7]}\nOBJ={res.F}")
+    print(f"Best solution: \nwx={res.X[0]}\nwy={res.X[1]}\na={res.X[2]}\nP={res.X[3]}\nvmax={res.X[4]}\nOBJ={res.F}")

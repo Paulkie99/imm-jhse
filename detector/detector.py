@@ -40,8 +40,8 @@ class Detector:
         self.gmc = None
         self.add_noise = add_noise
 
-    def load(self,cam_para_file, det_file, gmc_file = None):
-        self.mapper = Mapper(cam_para_file,"MOT17")
+    def load(self,cam_para_file, det_file, gmc_file = None,p_alpha=0):
+        self.mapper = Mapper(cam_para_file,"MOT17",p_alpha)
         self.load_detfile(det_file)
 
         if gmc_file is not None:
@@ -94,8 +94,8 @@ class Detector:
         dets = self.dets[frame_id]
         dets = [det for det in dets if det.det_class == det_class and det.conf >= conf_thresh]
 
-        # for det in dets:
-        #     det.y,det.R = self.mapper.mapto([det.bb_left,det.bb_top,det.bb_width,det.bb_height])
+        for det in dets:
+            det.y,det.R = self.mapper.get_UV_and_error(det.get_box())
         return dets
 
     def cmc(self,x,y,w,h,frame_id):
