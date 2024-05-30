@@ -35,15 +35,16 @@ class Detection:
 
 # Detector类，用于从文本文件读取任意一帧中的目标检测的结果
 class Detector:
-    def __init__(self, noise_degree=0, frame_width=1920, frame_height=1080):
+    def __init__(self, noise_degree=0, frame_width=1920, frame_height=1080, dt=1/30):
         self.seq_length = 0
         self.gmc = None
         self.noise_degree = noise_degree
         self.frame_width = frame_width
         self.frame_height = frame_height
+        self.dt = dt
 
     def load(self,cam_para_file, det_file, gmc_file = None,p_alpha=0):
-        self.mapper = Mapper(cam_para_file,"MOT17",p_alpha,noise_degree=self.noise_degree,frame_width=self.frame_width,frame_height=self.frame_height)
+        self.mapper = Mapper(cam_para_file,"MOT17",p_alpha,noise_degree=self.noise_degree,frame_width=self.frame_width,frame_height=self.frame_height,dt=self.dt)
         self.load_detfile(det_file)
 
         if gmc_file is not None:

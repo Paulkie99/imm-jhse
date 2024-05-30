@@ -86,7 +86,7 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
     print(det_file)
     print(cam_para)
 
-    detector = Detector(args.add_cam_noise, args.frame_width, args.frame_height)
+    detector = Detector(args.add_cam_noise, args.frame_width, args.frame_height, 1/args.fps)
     detector.load(cam_para, det_file,gmc_file)
     print(f"seq_length = {detector.seq_length}")
 

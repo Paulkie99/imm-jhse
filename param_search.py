@@ -92,7 +92,7 @@ def run_param_search(x,
     f_width=1920
     f_height=1080
 
-    detector = Detector(args.add_cam_noise, args.frame_width, args.frame_height)
+    detector = Detector(args.add_cam_noise, args.frame_width, args.frame_height, 1/args.fps)
     detector.load(cam_para, det_file,gmc_file,process_cov_alpha)
     print(f"seq_length = {detector.seq_length}")
 
@@ -232,7 +232,7 @@ if __name__ == '__main__':
             self.F.set(algorithm.pop.get("F"))
 
     res = minimize(problem, algorithm, 
-                   get_termination("n_eval", 100),
+                   get_termination("n_eval", 125),
                    output=MyOutput(),
                    verbose=True, seed=1)
     print(f"Best solution: \nwx={res.X[0]}\nwy={res.X[1]}\na={res.X[2]}\nP={res.X[3]}\nvmax={res.X[4]}\nOBJ={res.F}")

@@ -217,3 +217,5 @@ class KalmanTracker(object):
         # print(np.isclose(self.kf.x[:4], (self.kf.x + kalman_gain @ (homog[:, None] - proj))[:4]).all())
         self.kf.x = self.kf.x + kalman_gain @ (homog[:, None] - proj)
         self.kf.P = (np.eye(self.kf.P.shape[0]) - kalman_gain @ update_mat) @ self.kf.P
+        self.A = np.r_[self.kf.x[-8:, 0], [1]].reshape((3, 3)).T
+        self.InvA = np.linalg.inv(self.A)
