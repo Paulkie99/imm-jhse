@@ -51,8 +51,9 @@ class UCMCTrack(object):
         
         self.associate_tentative(dets)
 
-        self.detector.mapper.predict(frame_affine)
-        updated_tracks = [track for track in self.trackers if track.detidx > -1]
+        if frame_id > 1:
+            self.detector.mapper.predict(frame_affine)
+        updated_tracks = [track for track in self.trackers if track.detidx > -1 and track.status == TrackStatus.Confirmed]
         self.detector.mapper.update(updated_tracks, dets)
         for track in self.trackers:
             track.update_homography(self.detector.mapper.A.T.flatten()[:-1], self.detector.mapper.covariance)
@@ -95,12 +96,12 @@ class UCMCTrack(object):
 
         if num_det*num_trk > 0:
             cost_matrix = np.zeros((num_det, num_trk))
-            for i in range(num_det):
-                det_idx = detidx_high[i]
-                for j in range(num_trk):
-                    trk_idx = trackidx[j]
-                    # cost_matrix[i,j] = self.trackers[trk_idx].distance(*self.detector.mapper.get_UV_and_error(dets[det_idx].get_box()))
-                    cost_matrix[i,j] = self.trackers[trk_idx].distance(dets[det_idx].y, dets[det_idx].R)
+            det_ys = [dets[det_idx].y for det_idx in detidx_high]
+            det_covs = [dets[det_idx].R for det_idx in detidx_high]
+            for j in range(num_trk):
+                trk_idx = trackidx[j]
+                # cost_matrix[i,j] = self.trackers[trk_idx].distance(*self.detector.mapper.get_UV_and_error(dets[det_idx].get_box()))
+                cost_matrix[:,j] = self.trackers[trk_idx].distance(det_ys, det_covs)
                 
             matched_indices,unmatched_a,unmatched_b = linear_assignment(cost_matrix, self.a1)
             
@@ -132,15 +133,14 @@ class UCMCTrack(object):
         num_trk = len(trackidx_remain)
         if num_det*num_trk > 0:
             cost_matrix = np.zeros((num_det, num_trk))
-            for i in range(num_det):
-                det_idx = detidx_low[i]
-                for j in range(num_trk):
-                    trk_idx = trackidx_remain[j]
-                    # cost_matrix[i,j] = self.trackers[trk_idx].distance(*self.detector.mapper.get_UV_and_error(dets[det_idx].get_box()))
-                    cost_matrix[i,j] = self.trackers[trk_idx].distance(dets[det_idx].y, dets[det_idx].R)
+            det_ys = [dets[det_idx].y for det_idx in detidx_low]
+            det_covs = [dets[det_idx].R for det_idx in detidx_low]
+            for j in range(num_trk):
+                trk_idx = trackidx_remain[j]
+                # cost_matrix[i,j] = self.trackers[trk_idx].distance(*self.detector.mapper.get_UV_and_error(dets[det_idx].get_box()))
+                cost_matrix[:,j] = self.trackers[trk_idx].distance(det_ys, det_covs)
             matched_indices,unmatched_a,unmatched_b = linear_assignment(cost_matrix,self.a2)
             
-
             for i in unmatched_b:
                 trk_idx = trackidx_remain[i]
                 self.trackers[trk_idx].status = TrackStatus.Coasted
@@ -166,12 +166,13 @@ class UCMCTrack(object):
         num_trk = len(self.tentative_idx)
 
         cost_matrix = np.zeros((num_det, num_trk))
-        for i in range(num_det):
-            det_idx = self.detidx_remain[i]
+        det_ys = [dets[det_idx].y for det_idx in self.detidx_remain]
+        det_covs = [dets[det_idx].R for det_idx in self.detidx_remain]
+        if len(det_ys):
             for j in range(num_trk):
                 trk_idx = self.tentative_idx[j]
                 # cost_matrix[i,j] = self.trackers[trk_idx].distance(*self.detector.mapper.get_UV_and_error(dets[det_idx].get_box()))
-                cost_matrix[i,j] = self.trackers[trk_idx].distance(dets[det_idx].y, dets[det_idx].R)
+                cost_matrix[:,j] = self.trackers[trk_idx].distance(det_ys, det_covs)
             
         matched_indices,unmatched_a,unmatched_b = linear_assignment(cost_matrix,self.a1)
 

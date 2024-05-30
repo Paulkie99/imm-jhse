@@ -1,3 +1,4 @@
+import itertools
 import numpy as np
 import os
 import scipy
@@ -90,23 +91,30 @@ def readCamParaFile(camera_para):
     return Ki,Ko,True
 
 class Mapper(object):
-    def __init__(self, campara_file,dataset= "kitti",process_alpha=0):
+    def __init__(self, campara_file,dataset= "kitti",process_alpha=0,noise_degree=0,frame_width=1920,frame_height=1080):
         self.A = np.zeros((3, 3))
         if dataset == "kitti":
             self.KiKo, self.is_ok = readKittiCalib(campara_file)
-            z0 = -1.73
+            self.z0 = -1.73
         else:
             self.Ki,self.Ko, self.is_ok = readCamParaFile(campara_file)
             self.KiKo = np.dot(self.Ki, self.Ko)
-            z0 = 0
+            self.z0 = 0
 
         homogs = []
-        for error_deg in np.arange(-0.5, 0.5, 0.2):
-            self.disturb_campara(error_deg)
-            self.A /= self.A[-1, -1]
-            homogs.append(self.A.copy().flatten())
-            self.reset_campara()
-        self.covariance = np.ones((8, 8)) * 1e-6 + np.cov(np.array(homogs).T)[:8, :8]
+        # error_degs = np.arange(-0.5, 0.51, 0.1)
+        # z0s = np.arange(-1, 1.1, 0.2)
+        # prod = itertools.product(error_degs, z0s)
+        # for error_deg, z0 in prod:
+        #     self.disturb_campara(error_deg, z0)
+        #     self.A /= self.A[-1, -1]
+        #     homogs.append(self.A.copy().flatten())
+        #     self.reset_campara()
+        # self.covariance = np.cov(np.array(homogs).T)[:8, :8]
+
+        self.reset_campara()
+        if noise_degree > 0:
+            self.disturb_campara(noise_degree)
 
         self.A /= self.A[-1, -1]
         self.InvA = np.linalg.inv(self.A)
@@ -123,7 +131,9 @@ class Mapper(object):
             [-1.922274625378042, 0.04081268209462464, -0.0003479636004694695, -1.1152170324863155, -0.2222987925582746, 0.0001678344189739308, 231.84843578289627, -10.313850943932446],
             [-2665616.4545330876, 56960.8981261388, -481.5971754964347, -1547025.442241783, -308689.77792722615, 231.84843578289627, 321526429.6870994, -14311747.490882616],
             [118640.42175579324, -2541.387808965757, 21.430775240759523, 68868.92273824145, 13742.050620772832, -10.313850943932444, -14311747.490882615, 637480.5332748594]
-        ]) #/ 1e8
+        ])
+        self.covariance /= self.covariance.max()
+        # self.covariance *= 1e3
 
         self.process_covariance = np.array([
             [1.691150931731723, 0.027796535337745388, 0.0006057967689015404, 0.7958454550718719, 0.13484592368210732, -0.00032707262341580366, -187.41534165849208, 6.7204375279830275],
@@ -134,7 +144,18 @@ class Mapper(object):
             [-0.00032707262341580366, -8.26410353986821e-06, -1.2944418780092754e-07, -0.00015322502803559153, -2.2613232506864336e-05, 7.467887557570941e-08, 0.03636317558003982, -0.0013145955183940965],
             [-187.41534165849208, -2.6014190135632274, -0.06646347291813817, -89.79409965684852, -14.950530428975313, 0.03636317558003982, 21001.77798558338, -761.7908047894807],
             [6.7204375279830275, -0.0490543259812558, 0.0024582533174924703, 3.3762956539985574, 0.49244234683260724, -0.0013145955183940965, -761.7908047894807, 45.996392809465235]
-        ]) 
+        ])
+        self.process_covariance *= 1 / self.process_covariance.max()
+        self.process_covariance = np.eye(8) * 1e-3
+
+        # scalar_mat = np.array([
+        #     [frame_width / 1280, 0, 0],
+        #     [0, frame_height / 720, 0],
+        #     [0, 0, 1]
+        # ])
+        # scalar_block = scipy.linalg.block_diag(scalar_mat, scalar_mat, scalar_mat[:2, :2])
+        # self.covariance = scalar_block @ self.covariance @ scalar_block.T
+        # self.process_covariance = scalar_block @ self.process_covariance @ scalar_block.T
 
     # def predict(self, affine, trackers):
     def predict(self, affine):
@@ -261,7 +282,7 @@ class Mapper(object):
         sigma_uv[1,1] = v_err*v_err
         return uv, sigma_uv
     
-    def disturb_campara(self,z):
+    def disturb_campara(self,z, z0):
 
         # 根据z轴旋转，构造旋转矩阵Rz
         Rz = np.array([[np.cos(z), -np.sin(z), 0], [np.sin(z), np.cos(z), 0], [0, 0, 1]])
@@ -272,13 +293,14 @@ class Mapper(object):
         Ko_new[:3, :3] = R
         self.KiKo = np.dot(self.Ki, Ko_new)
         self.A[:, :2] = self.KiKo[:, :2]
-        self.A[:, 2] = self.KiKo[:, 3]
+        self.A[:, 2] = z0 * self.KiKo[:, 2] + self.KiKo[:, 3]
         self.InvA = np.linalg.inv(self.A)
 
     def reset_campara(self):
         self.KiKo = np.dot(self.Ki, self.Ko)
         self.A[:, :2] = self.KiKo[:, :2]
-        self.A[:, 2] = self.KiKo[:, 3]
+        self.A[:, 2] = self.z0 * self.KiKo[:, 2] + self.KiKo[:, 3]
+
         self.InvA = np.linalg.inv(self.A)
 
 

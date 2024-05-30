@@ -156,8 +156,6 @@ class KalmanTracker(object):
         xy1 = np.ones((3, 1))
         xy1[:2, :] = xy
 
-        uv = y
-
         b = A @ xy1
         gamma = 1 / b[2,:]
         uv_proj = b[:2,:] * gamma
@@ -170,39 +168,41 @@ class KalmanTracker(object):
         dU_dX = np.zeros((2, self.kf.dim_x - 8))
         dU_dX[:, [0, 2]] = gamma * A[:2, :2] - (gamma**2) * b[:2,:] * A[2, :2]
 
-        diff = uv - uv_proj
+        diff = np.array(y) - uv_proj
 
         jacobian = np.c_[dU_dX, dU_dA]
 
-        S = np.dot(jacobian, np.dot(self.kf.P,jacobian.T)) + R
+        S = np.dot(jacobian, np.dot(self.kf.P,jacobian.T))[None, ...] + np.array(R)
         SI = np.linalg.inv(S)
-        mahalanobis = np.dot(diff.T,np.dot(SI,diff))
+        mahalanobis = diff.transpose(0, 2, 1) @ SI @ diff
         try:
             logdet = np.linalg.det(S)
             logdet = np.log(logdet)
         except (RuntimeWarning, LinAlgError):
             logdet = 6000
-        if np.isnan(logdet):
-            logdet = 6000
-        return mahalanobis[0,0] + logdet / 6
-
-        xy, R = self.uv2xy(y, R)
+        logdet[np.isnan(logdet)] = 6000
+        return mahalanobis.squeeze() + logdet / 6
+        xy = []
+        Rs = []
+        for idx in range(len(y)):
+            xy_, R_ = self.uv2xy(y[idx], R[idx])
+            xy.append(xy_)
+            Rs.append(R_)
         jacobian = np.zeros((2, self.kf.dim_x))
         jacobian[:, [0, 2]] = np.eye(2)
         
-        diff = xy - self.kf.x[[0, 2], :]
+        diff = np.array(xy) - self.kf.x[[0, 2], :]
 
-        S = np.dot(jacobian, np.dot(self.kf.P,jacobian.T)) + R
+        S = np.dot(jacobian, np.dot(self.kf.P,jacobian.T)) + np.array(Rs)
         SI = np.linalg.inv(S)
-        mahalanobis = np.dot(diff.T,np.dot(SI,diff))
+        mahalanobis = diff.transpose(0, 2, 1) @ SI @ diff
         try:
             logdet = np.linalg.det(S)
             logdet = np.log(logdet)
         except (RuntimeWarning, LinAlgError):
             logdet = 6000
-        if np.isnan(logdet):
-            logdet = 6000
-        return mahalanobis[0,0] + logdet
+        logdet[np.isnan(logdet)] = 6000
+        return mahalanobis.squeeze() + logdet
     
     def update_homography(self, homog, homog_cov):
         update_mat = np.zeros((homog.size, self.kf.dim_x))

@@ -35,13 +35,15 @@ class Detection:
 
 # Detector类，用于从文本文件读取任意一帧中的目标检测的结果
 class Detector:
-    def __init__(self, add_noise = False):
+    def __init__(self, noise_degree=0, frame_width=1920, frame_height=1080):
         self.seq_length = 0
         self.gmc = None
-        self.add_noise = add_noise
+        self.noise_degree = noise_degree
+        self.frame_width = frame_width
+        self.frame_height = frame_height
 
     def load(self,cam_para_file, det_file, gmc_file = None,p_alpha=0):
-        self.mapper = Mapper(cam_para_file,"MOT17",p_alpha)
+        self.mapper = Mapper(cam_para_file,"MOT17",p_alpha,noise_degree=self.noise_degree,frame_width=self.frame_width,frame_height=self.frame_height)
         self.load_detfile(det_file)
 
         if gmc_file is not None:
@@ -73,17 +75,17 @@ class Detector:
                 if det.det_class == -1:
                     det.det_class = 0
                 
-                if self.add_noise:
-                    if frame_id % 2 == 0:
-                        noise_z = 0.5/180.0*np.pi
-                    else:
-                        noise_z = -0.5/180.0*np.pi
-                    self.mapper.disturb_campara(noise_z)
+                # if self.add_noise:
+                #     if frame_id % 2 == 0:
+                #         noise_z = 0.5/180.0*np.pi
+                #     else:
+                #         noise_z = -0.5/180.0*np.pi
+                #     self.mapper.disturb_campara(noise_z)
 
                 # det.y,det.R = self.mapper.mapto([det.bb_left,det.bb_top,det.bb_width,det.bb_height])
                 
-                if self.add_noise:
-                    self.mapper.reset_campara()
+                # if self.add_noise:
+                #     self.mapper.reset_campara()
 
                 # 将det添加到字典中
                 if frame_id not in self.dets:

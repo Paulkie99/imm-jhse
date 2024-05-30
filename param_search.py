@@ -13,7 +13,7 @@ from pymoo.util.display.column import Column
 from pymoo.util.display.output import Output
 from scipy import interpolate
 from detector.detector import Detector
-from eval_mot17 import eval_HOTA
+from eval_mot17 import eval_AssA
 from tracker.ucmc import UCMCTrack
 from util.run_ucmc import Tracklet, run_ucmc, make_args
 from eval.interpolation import interpolate
@@ -37,7 +37,8 @@ def make_args():
     parser.add_argument('--v_max', type=float, default=10, help='assignment threshold')
     parser.add_argument("--add_cam_noise", action="store_true", help="add noise to camera parameter.")
     parser.add_argument("--P", type=float, default=1)
-
+    parser.add_argument("--frame_width", type=float, default=1920)
+    parser.add_argument("--frame_height", type=float, default=1080)
     args = parser.parse_args()
 
 
@@ -91,12 +92,12 @@ def run_param_search(x,
     f_width=1920
     f_height=1080
 
-    detector = Detector(args.add_cam_noise)
+    detector = Detector(args.add_cam_noise, args.frame_width, args.frame_height)
     detector.load(cam_para, det_file,gmc_file,process_cov_alpha)
     print(f"seq_length = {detector.seq_length}")
 
     a1 = a
-    a2 = a
+    a2 = a1
     high_score = args.high_score
     fps = args.fps
     # vmax = args.vmax
@@ -114,7 +115,11 @@ def run_param_search(x,
             frame_affine = detector.gmc.get_affine(frame_id)
             dets = detector.get_dets(frame_id, conf_thresh)
             frametime = time.time()
-            tracker.update(dets,frame_id,frame_affine)
+            try:
+                tracker.update(dets,frame_id,frame_affine)
+            except Exception as e:
+                print(e)
+                return 0
             if time.time() - frametime >= 0.2:
                 print("Aborting optimistation iteration")
                 return 0
@@ -158,7 +163,7 @@ def run_param_search(x,
         return 0
     print(f"Time cost: {time.time() - t1:.2f}s")
 
-    return eval_HOTA()
+    return eval_AssA(wx, wy, a, vmax)
 
 
 if __name__ == '__main__':
@@ -192,8 +197,8 @@ if __name__ == '__main__':
     problem = FunctionalProblem(
         n_var,
         obj,
-        xl=np.array([0.001, 0.001, 1,  0, 0.001]),
-        xu=np.array([5,     5,     100,1, 3])
+        xl=np.array([0.001, 0.001, 7,   0, 0.001]),
+        xu=np.array([5,     5,     100, 1, 3])
     )
     # problem = FunctionalProblem(
     #     n_var,
@@ -203,7 +208,7 @@ if __name__ == '__main__':
     # )
 
     algorithm = PatternSearch(x0=np.array([args.wx, args.wy, args.a, args.P, args.vmax]),
-                              init_delta=0.5)
+                              init_delta=0.75)
     # algorithm = PatternSearch(x0=np.array([args.a, args.P]),
     #                           init_delta=0.5)
 
@@ -227,7 +232,7 @@ if __name__ == '__main__':
             self.F.set(algorithm.pop.get("F"))
 
     res = minimize(problem, algorithm, 
-                   get_termination("n_eval", 300),
+                   get_termination("n_eval", 100),
                    output=MyOutput(),
                    verbose=True, seed=1)
     print(f"Best solution: \nwx={res.X[0]}\nwy={res.X[1]}\na={res.X[2]}\nP={res.X[3]}\nvmax={res.X[4]}\nOBJ={res.F}")

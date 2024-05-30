@@ -41,6 +41,8 @@ def make_args():
     parser.add_argument('--v_max', type=float, default=10, help='assignment threshold')
     parser.add_argument("--add_cam_noise", action="store_true", help="add noise to camera parameter.")
     parser.add_argument("--P", type=float, default=1)
+    parser.add_argument("--frame_width", type=float, default=1920)
+    parser.add_argument("--frame_height", type=float, default=1080)
     
     args = parser.parse_args()
 
@@ -84,7 +86,7 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
     print(det_file)
     print(cam_para)
 
-    detector = Detector(args.add_cam_noise)
+    detector = Detector(args.add_cam_noise, args.frame_width, args.frame_height)
     detector.load(cam_para, det_file,gmc_file)
     print(f"seq_length = {detector.seq_length}")
 
