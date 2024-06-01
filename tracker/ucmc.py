@@ -53,7 +53,7 @@ class UCMCTrack(object):
 
         if frame_id > 1:
             self.detector.mapper.predict(frame_affine)
-        updated_tracks = [track for track in self.trackers if track.detidx > -1 and track.status == TrackStatus.Confirmed]
+        updated_tracks = [track for track in self.trackers if track.detidx > -1]
         self.detector.mapper.update(updated_tracks, dets)
         # for track in self.trackers:
         #     track.update_homography(self.detector.mapper.A.T.flatten()[:-1], self.detector.mapper.covariance)
@@ -116,6 +116,7 @@ class UCMCTrack(object):
                 det_idx = detidx_high[i]
                 trk_idx = trackidx[j]
                 self.trackers[trk_idx].update(dets[det_idx].y, dets[det_idx].R)
+                self.trackers[trk_idx].last_box = dets[det_idx]
                 # self.detector.mapper.update(
                 #     *self.detector.mapper.get_UV_and_error([dets[det_idx].bb_left,dets[det_idx].bb_top,dets[det_idx].bb_width,dets[det_idx].bb_height]),
                 #                              self.trackers[trk_idx].kf.x, self.trackers[trk_idx].kf.P)
@@ -152,7 +153,8 @@ class UCMCTrack(object):
             for i,j in matched_indices:
                 det_idx = detidx_low[i]
                 trk_idx = trackidx_remain[j]
-                self.trackers[trk_idx].update(dets[det_idx].y, dets[det_idx].R)                
+                self.trackers[trk_idx].update(dets[det_idx].y, dets[det_idx].R)       
+                self.trackers[trk_idx].last_box = dets[det_idx]
                 # self.detector.mapper.update(
                 #     *self.detector.mapper.get_UV_and_error([dets[det_idx].bb_left,dets[det_idx].bb_top,dets[det_idx].bb_width,dets[det_idx].bb_height]),
                 #                              self.trackers[trk_idx].kf.x, self.trackers[trk_idx].kf.P)
@@ -182,6 +184,7 @@ class UCMCTrack(object):
             det_idx = self.detidx_remain[i]
             trk_idx = self.tentative_idx[j]
             self.trackers[trk_idx].update(dets[det_idx].y, dets[det_idx].R)
+            self.trackers[trk_idx].last_box = dets[det_idx]
             # self.detector.mapper.update(
             #         *self.detector.mapper.get_UV_and_error([dets[det_idx].bb_left,dets[det_idx].bb_top,dets[det_idx].bb_width,dets[det_idx].bb_height]),
             #                                  self.trackers[trk_idx].kf.x, self.trackers[trk_idx].kf.P)
@@ -209,8 +212,8 @@ class UCMCTrack(object):
     
     def initial_tentative(self,dets,H,H_P,H_Q):
         for i in self.detidx_remain: 
-            dets[i].y,dets[i].R = self.detector.mapper.uv2xy(dets[i].y,dets[i].R)
-            self.trackers.append(KalmanTracker(dets[i].y,dets[i].R,self.wx,self.wy,self.vmax, dets[i].bb_width,dets[i].bb_height,self.dt,H,H_P,H_Q,self.detector.mapper.process_alpha))
+            self.trackers.append(KalmanTracker(*self.detector.mapper.uv2xy(dets[i].y,dets[i].R),self.wx,self.wy,self.vmax, dets[i].bb_width,dets[i].bb_height,self.dt,H,H_P,H_Q,self.detector.mapper.process_alpha))
+            self.trackers[-1].last_box = dets[i]
             self.trackers[-1].status = TrackStatus.Tentative
             self.trackers[-1].detidx = i
         self.detidx_remain = []
