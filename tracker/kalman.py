@@ -17,13 +17,15 @@ class KalmanTracker(object):
 
     count = 1
 
-    def __init__(self, y, R, wx, wy, vmax, w,h,dt=1/30,H=None,H_P=None,H_Q=None,alpha_cov=1):
+    def __init__(self, det, wx, wy, vmax,dt=1/30,H=None,H_P=None,H_Q=None,alpha_cov=1):
+        self.A_orig = np.r_[H, [1]].reshape((3, 3)).T
+        self.A = self.A_orig.copy()
+        self.InvA_orig = np.linalg.inv(self.A_orig)
+        y, R = self.get_UV_and_error(det.get_box())
+        y, R = self.uv2xy(y, R)
         
         self.kf = KalmanFilter(dim_x=12, dim_z=2)
         self.motion_transition_mat = np.array([[1, dt, 0, 0], [0, 1, 0, 0], [0, 0, 1, dt], [0, 0, 0, 1]])
-        self.kf.F = np.array([[1, dt, 0, 0], [0, 1, 0, 0], [0, 0, 1, dt], [0, 0, 0, 1]])
-        self.kf.H = np.c_[np.array([[1, 0, 0, 0], [0, 0, 1, 0]]), np.zeros((2, 8))]
-        self.kf.R = R
         self.kf.P = np.zeros((4, 4))
         np.fill_diagonal(self.kf.P, np.array([1, (vmax / 3)**2, 1,  (vmax / 3)**2]))
         # np.fill_diagonal(self.kf.P, np.array([1, vmax**2/3.0, 1,  vmax**2/3.0]))
@@ -46,25 +48,17 @@ class KalmanTracker(object):
         self.kf.x[3] = 0
         self.kf.x[4:, 0] = H
 
-        self.A_orig = np.r_[H, [1]].reshape((3, 3)).T
-        self.A = self.A_orig.copy()
-        self.InvA_orig = np.linalg.inv(self.A_orig)
-
         self.id = KalmanTracker.count
         KalmanTracker.count += 1
         self.age = 0
         self.death_count = 0
         self.birth_count = 0
         self.detidx = -1
-        self.w = w
-        self.h = h
 
         self.status = TrackStatus.Tentative
         self.alpha = alpha_cov
 
-        self.last_box = None
-
-    def update(self, y, R):
+    def update(self, y, R, w):
         A = self.A
 
         xy = self.kf.x[[0, 2], :]
@@ -89,7 +83,7 @@ class KalmanTracker(object):
 
         jacobian = np.c_[dU_dX, dU_dA]
 
-        S = np.dot(jacobian, np.dot(self.kf.P,jacobian.T)) + R
+        S = np.dot(jacobian, np.dot(self.kf.P,jacobian.T)) + R[:2, :2]
         SI = np.linalg.inv(S)
 
         kalman_gain = self.kf.P @ jacobian.T @ SI
@@ -121,26 +115,6 @@ class KalmanTracker(object):
         self.A = np.r_[self.kf.x[-8:, 0], [1]].reshape((3, 3)).T
         self.InvA = np.linalg.inv(self.A)
 
-        uv = b / b[-1, 0]
-
-        M = affine[:,:2]
-        T = np.zeros((2,1))
-        T[0,0] = affine[0,2]
-        T[1,0] = affine[1,2]
-
-        u,v=uv[0,0],uv[1,0]
-        w,h = self.last_box.bb_width, self.last_box.bb_height
-        p_center = np.array([[u],[v-h/2]])
-        p_wh = np.array([[w],[h]])
-        p_center = np.dot(M,p_center) + T
-        p_wh = np.dot(M,p_wh)
-
-        u = p_center[0,0]
-        v = p_center[1,0]+p_wh[1,0]/2
-        self.last_box.foot_x, self.last_box.foot_y, self.last_box.bb_width, self.last_box.bb_height = u,v,p_wh[0,0],p_wh[1,0]
-
-        return np.dot(self.kf.H, self.kf.x)
-
     def get_state(self):
         return self.kf.x
     
@@ -153,14 +127,7 @@ class KalmanTracker(object):
         dX_dU = gamma * self.InvA_orig[:2, :2] - (gamma**2) * b[:2,:] * self.InvA_orig[2, :2]  # dX/du
         xy = b[:2,:] * gamma
 
-        # gamma2 = 1 / (np.dot(self.A[-1, :2], xy[:, 0]) + 1)
-        # dU_dA = gamma2 * np.array([
-        #     [xy[0, 0], 0, -xy[0, 0] * uv[0, 0], xy[1, 0], 0, -uv[0, 0] * xy[1, 0], 1, 0],
-        #     [0, xy[0, 0], -xy[0, 0] * uv[1, 0], 0, xy[1, 0], -uv[1, 0] * xy[1, 0], 0, 1]
-        #                           ])  # du/dA
-        # dX_dA = dX_dU @ dU_dA
-
-        sigma_xy = np.dot(np.dot(dX_dU, sigma_uv), dX_dU.T) #+ np.dot(np.dot(dX_dA, self.kf.P[-8:, -8:]), dX_dA.T)
+        sigma_xy = np.dot(np.dot(dX_dU, sigma_uv[:2, :2]), dX_dU.T)
         return xy, sigma_xy
     
     def mapto(self,box):
@@ -176,7 +143,7 @@ class KalmanTracker(object):
         sigma_uv[1,1] = v_err*v_err
         return uv, sigma_uv
     
-    def distance(self, y, R, affine):
+    def distance(self, y, R, ws):
         # A = self.A
 
         # xy = self.kf.x[[0, 2], :]
@@ -252,18 +219,3 @@ class KalmanTracker(object):
         logdet[np.isnan(logdet)] = 6000
         return mahalanobis.squeeze() + logdet
     
-    def update_homography(self, homog, homog_cov):
-        update_mat = np.zeros((homog.size, self.kf.dim_x))
-        homog_update_mat = np.eye(8)
-        update_mat[:, -8:] = homog_update_mat
-
-        proj = update_mat @ self.kf.x
-        proj_cov = update_mat @ self.kf.P @ update_mat.T + homog_cov
-
-        kalman_gain = self.kf.P @ update_mat.T @ np.linalg.inv(proj_cov)
-
-        # print(np.isclose(self.kf.x[:4], (self.kf.x + kalman_gain @ (homog[:, None] - proj))[:4]).all())
-        self.kf.x = self.kf.x + kalman_gain @ (homog[:, None] - proj)
-        self.kf.P = (np.eye(self.kf.P.shape[0]) - kalman_gain @ update_mat) @ self.kf.P
-        self.A = np.r_[self.kf.x[-8:, 0], [1]].reshape((3, 3)).T
-        self.InvA = np.linalg.inv(self.A)

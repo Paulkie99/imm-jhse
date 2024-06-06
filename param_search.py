@@ -208,7 +208,7 @@ if __name__ == '__main__':
     # )
 
     algorithm = PatternSearch(x0=np.array([args.wx, args.wy, args.a, args.P, args.vmax]),
-                              init_delta=0.25)
+                              init_delta=0.75)
     # algorithm = PatternSearch(x0=np.array([args.a, args.P]),
     #                           init_delta=0.5)
 

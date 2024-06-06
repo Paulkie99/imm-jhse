@@ -47,30 +47,18 @@ class UCMCTrack(object):
         for track in self.trackers:
             track.predict(frame_affine)
                    
-        self.data_association(dets,frame_id,frame_affine)
+        self.data_association(dets)
         
-        self.associate_tentative(dets, frame_affine)
+        self.associate_tentative(dets)
 
-        # if frame_id > 1:
-        #     self.detector.mapper.predict(frame_affine)
-
-        #     updated_tracks = [track for track in self.trackers if track.detidx > -1]
-        #     self.detector.mapper.update(updated_tracks, dets)
-
-        self.initial_tentative(dets, frame_affine, self.detector.mapper.A.T.flatten()[:-1], self.detector.mapper.covariance,
+        self.initial_tentative(dets, self.detector.mapper.A.T.flatten()[:-1], self.detector.mapper.covariance,
         self.detector.mapper.process_covariance)
-
-        # if frame_id > 1:
-        #     for track in self.trackers:
-        #         track.update_homography(self.detector.mapper.A.T.flatten()[:-1], self.detector.mapper.covariance)
-        #     det_idx = track.detidx
-        #     track.update(dets[det_idx].y, dets[det_idx].R)
         
         self.delete_old_trackers()
 
         self.update_status(dets)
     
-    def data_association(self, dets,frame_id,frame_affine):
+    def data_association(self, dets):
         # Separate detections into high score and low score
         detidx_high = []
         detidx_low = []
@@ -79,14 +67,6 @@ class UCMCTrack(object):
                 detidx_high.append(i)
             else:
                 detidx_low.append(i)
-
-        # Predcit new locations of tracks
-        # for track in self.trackers:
-        #     track.predict()
-            # if self.use_cmc:
-            #     x,y = self.detector.cmc(track.kf.x[0,0],track.kf.x[2,0],track.w,track.h,frame_id)
-            #     track.kf.x[0,0] = x
-            #     track.kf.x[2,0] = y
         
         trackidx_remain = []
         self.detidx_remain = []
@@ -103,10 +83,10 @@ class UCMCTrack(object):
             cost_matrix = np.zeros((num_det, num_trk))
             det_ys = [dets[det_idx].y for det_idx in detidx_high]
             det_covs = [dets[det_idx].R for det_idx in detidx_high]
+            det_ws = [dets[det_idx].bb_width for det_idx in detidx_high]
             for j in range(num_trk):
                 trk_idx = trackidx[j]
-                # cost_matrix[i,j] = self.trackers[trk_idx].distance(*self.detector.mapper.get_UV_and_error(dets[det_idx].get_box()))
-                cost_matrix[:,j] = self.trackers[trk_idx].distance(det_ys, det_covs, frame_affine)
+                cost_matrix[:,j] = self.trackers[trk_idx].distance(det_ys, det_covs, det_ws)
                 
             matched_indices,unmatched_a,unmatched_b = linear_assignment(cost_matrix, self.a1)
             
@@ -118,11 +98,7 @@ class UCMCTrack(object):
             for i,j in matched_indices:
                 det_idx = detidx_high[i]
                 trk_idx = trackidx[j]
-                self.trackers[trk_idx].update(dets[det_idx].y, dets[det_idx].R)
-                self.trackers[trk_idx].last_box = dets[det_idx]
-                # self.detector.mapper.update(
-                #     *self.detector.mapper.get_UV_and_error([dets[det_idx].bb_left,dets[det_idx].bb_top,dets[det_idx].bb_width,dets[det_idx].bb_height]),
-                #                              self.trackers[trk_idx].kf.x, self.trackers[trk_idx].kf.P)
+                self.trackers[trk_idx].update(dets[det_idx].y, dets[det_idx].R, dets[det_idx].bb_width)
                 self.trackers[trk_idx].death_count = 0
                 self.trackers[trk_idx].detidx = det_idx
                 self.trackers[trk_idx].R = dets[det_idx].R
@@ -141,10 +117,10 @@ class UCMCTrack(object):
             cost_matrix = np.zeros((num_det, num_trk))
             det_ys = [dets[det_idx].y for det_idx in detidx_low]
             det_covs = [dets[det_idx].R for det_idx in detidx_low]
+            det_ws = [dets[det_idx].bb_width for det_idx in detidx_low]
             for j in range(num_trk):
                 trk_idx = trackidx_remain[j]
-                # cost_matrix[i,j] = self.trackers[trk_idx].distance(*self.detector.mapper.get_UV_and_error(dets[det_idx].get_box()))
-                cost_matrix[:,j] = self.trackers[trk_idx].distance(det_ys, det_covs, frame_affine)
+                cost_matrix[:,j] = self.trackers[trk_idx].distance(det_ys, det_covs, det_ws)
             matched_indices,unmatched_a,unmatched_b = linear_assignment(cost_matrix,self.a2)
             
             for i in unmatched_b:
@@ -156,40 +132,32 @@ class UCMCTrack(object):
             for i,j in matched_indices:
                 det_idx = detidx_low[i]
                 trk_idx = trackidx_remain[j]
-                self.trackers[trk_idx].update(dets[det_idx].y, dets[det_idx].R)       
-                self.trackers[trk_idx].last_box = dets[det_idx]
-                # self.detector.mapper.update(
-                #     *self.detector.mapper.get_UV_and_error([dets[det_idx].bb_left,dets[det_idx].bb_top,dets[det_idx].bb_width,dets[det_idx].bb_height]),
-                #                              self.trackers[trk_idx].kf.x, self.trackers[trk_idx].kf.P)
+                self.trackers[trk_idx].update(dets[det_idx].y, dets[det_idx].R, dets[det_idx].bb_width)       
                 self.trackers[trk_idx].death_count = 0
                 self.trackers[trk_idx].detidx = det_idx
                 self.trackers[trk_idx].R = dets[det_idx].R
                 self.trackers[trk_idx].status = TrackStatus.Confirmed
                 dets[det_idx].track_id = self.trackers[trk_idx].id
 
-    def associate_tentative(self, dets, frame_affine):
+    def associate_tentative(self, dets):
         num_det = len(self.detidx_remain)
         num_trk = len(self.tentative_idx)
 
         cost_matrix = np.zeros((num_det, num_trk))
         det_ys = [dets[det_idx].y for det_idx in self.detidx_remain]
         det_covs = [dets[det_idx].R for det_idx in self.detidx_remain]
+        det_ws = [dets[det_idx].bb_width for det_idx in self.detidx_remain]
         if len(det_ys):
             for j in range(num_trk):
                 trk_idx = self.tentative_idx[j]
-                # cost_matrix[i,j] = self.trackers[trk_idx].distance(*self.detector.mapper.get_UV_and_error(dets[det_idx].get_box()))
-                cost_matrix[:,j] = self.trackers[trk_idx].distance(det_ys, det_covs, frame_affine)
+                cost_matrix[:,j] = self.trackers[trk_idx].distance(det_ys, det_covs, det_ws)
             
         matched_indices,unmatched_a,unmatched_b = linear_assignment(cost_matrix,self.a1)
 
         for i,j in matched_indices:
             det_idx = self.detidx_remain[i]
             trk_idx = self.tentative_idx[j]
-            self.trackers[trk_idx].update(dets[det_idx].y, dets[det_idx].R)
-            self.trackers[trk_idx].last_box = dets[det_idx]
-            # self.detector.mapper.update(
-            #         *self.detector.mapper.get_UV_and_error([dets[det_idx].bb_left,dets[det_idx].bb_top,dets[det_idx].bb_width,dets[det_idx].bb_height]),
-            #                                  self.trackers[trk_idx].kf.x, self.trackers[trk_idx].kf.P)
+            self.trackers[trk_idx].update(dets[det_idx].y, dets[det_idx].R, dets[det_idx].bb_width)
             self.trackers[trk_idx].death_count = 0
             self.trackers[trk_idx].birth_count += 1
             self.trackers[trk_idx].detidx = det_idx
@@ -210,23 +178,9 @@ class UCMCTrack(object):
             unmatched_detidx.append(self.detidx_remain[i])
         self.detidx_remain = unmatched_detidx
 
-    def initial_tentative(self,dets,frame_affine,H,H_P,H_Q):
-        frame_affine = np.r_[frame_affine, [[0, 0, 1]]]
+    def initial_tentative(self,dets,H,H_P,H_Q):
         for i in self.detidx_remain: 
-            # uv1 = np.r_[dets[i].y, [[1]]]
-            # x_t_l = self.detector.mapper.InvA_orig @ uv1
-            # x_t_l /= x_t_l[-1, :]
-
-            # wh = frame_affine[:2, :2] @ np.array([[dets[i].bb_width], [dets[i].bb_height]])
-            # uv_center = frame_affine[:2, :2] @ np.array([[dets[i].bb_left + dets[i].bb_width / 2], [dets[i].bb_top + dets[i].bb_height / 2]]) + frame_affine[:2, -1]
-            # x_t_l_minus = self.detector.mapper.InvA_orig @ np.array([[uv_center[0, 0]], [uv_center[1, 0] + wh[1, 0] / 2], [1]])
-            # x_t_l_minus /= x_t_l_minus[-1, :]
-
-            # delta_x_t_l = x_t_l - x_t_l_minus 
-
-            x_global_t_minus, R = self.detector.mapper.uv2xy(dets[i].y, dets[i].bb_width, dets[i].bb_height, dets[i].R)
-            self.trackers.append(KalmanTracker(x_global_t_minus, R,self.wx,self.wy,self.vmax, dets[i].bb_width,dets[i].bb_height,self.dt,H,H_P,H_Q,self.detector.mapper.process_alpha))
-            # self.trackers.append(KalmanTracker(x_global_t_minus + delta_x_t_l[:2, :], R,self.wx,self.wy,self.vmax, dets[i].bb_width,dets[i].bb_height,self.dt,H,H_P,H_Q,self.detector.mapper.process_alpha))
+            self.trackers.append(KalmanTracker(dets[i],self.wx,self.wy,self.vmax,self.dt,H,H_P,H_Q,self.detector.mapper.process_alpha))
             self.trackers[-1].last_box = dets[i]
             self.trackers[-1].status = TrackStatus.Tentative
             self.trackers[-1].detidx = i
