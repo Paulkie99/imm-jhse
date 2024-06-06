@@ -98,6 +98,7 @@ class Detector:
         dets = [det for det in dets if det.det_class == det_class and det.conf >= conf_thresh]
 
         for det in dets:
+            # det.y,det.R = self.mapper.mapto(det.get_box())
             det.y,det.R = self.mapper.get_UV_and_error(det.get_box())
         return dets
 

@@ -118,6 +118,29 @@ class Mapper(object):
 
         self.A /= self.A[-1, -1]
         self.InvA = np.linalg.inv(self.A)
+        self.A_orig = self.A.copy()
+        self.InvA_orig = self.InvA.copy()
+
+        ground_pts_x = np.arange(0,10,0.5)
+        ground_pts_y = np.arange(-5,5,0.5)
+
+        ground_pts_ = itertools.product(ground_pts_x, ground_pts_y)
+        ground_pts = []
+        for pt in ground_pts_:
+            ground_pts.append([pt[0], pt[1], 1])
+        self.ground_pts = np.array(ground_pts)
+        img_pts = self.A @ self.ground_pts.T
+        img_pts /= img_pts[-1, :]
+        img_pts = img_pts.T
+
+        self.img_pts = []
+        for pt in img_pts:
+            if 0 <= pt[0] < frame_width and 0<= pt[1] < frame_height:
+                self.img_pts.append(pt)
+        self.img_pts = np.array(self.img_pts)
+        self.ground_pts = (self.InvA @ self.img_pts.T).T
+        self.ground_pts /= self.ground_pts[:, [-1]]
+        self.ground_pts_orig = self.ground_pts.copy()
 
         self.process_alpha = process_alpha
 
@@ -133,7 +156,7 @@ class Mapper(object):
         #     [118640.42175579324, -2541.387808965757, 21.430775240759523, 68868.92273824145, 13742.050620772832, -10.313850943932444, -14311747.490882615, 637480.5332748594]
         # ]) 
         # self.covariance /= self.covariance.max()
-        self.covariance = np.eye(8) * 1e-12# * (720 / frame_height)**2
+        self.covariance = np.eye(8) * 0 # * (720 / frame_height)**2
 
         # self.process_covariance = np.array([
         #     [1.691150931731723, 0.027796535337745388, 0.0006057967689015404, 0.7958454550718719, 0.13484592368210732, -0.00032707262341580366, -187.41534165849208, 6.7204375279830275],
@@ -145,8 +168,8 @@ class Mapper(object):
         #     [-187.41534165849208, -2.6014190135632274, -0.06646347291813817, -89.79409965684852, -14.950530428975313, 0.03636317558003982, 21001.77798558338, -761.7908047894807],
         #     [6.7204375279830275, -0.0490543259812558, 0.0024582533174924703, 3.3762956539985574, 0.49244234683260724, -0.0013145955183940965, -761.7908047894807, 45.996392809465235]
         # ]) 
-        self.process_covariance = self.covariance
-        # self.process_covariance = np.eye(8) * 1e-4 * (720 / frame_height)**2 * (0.04 / dt)**2
+        # self.process_covariance = self.covariance
+        self.process_covariance = np.eye(8) * 1e-3 # * (720 / frame_height)**2 * (0.04 / dt)**2
 
         # scalar_mat = np.array([
         #     [960 / frame_width, 0, 0],
@@ -158,14 +181,20 @@ class Mapper(object):
 
     # def predict(self, affine, trackers):
     def predict(self, affine):
-        self.A = np.r_[affine, [[0, 0, 1]]] @ self.A
+        affine = np.r_[affine, [[0, 0, 1]]]
+        self.A = affine @ self.A
         assert self.A[-1, -1] == 1
         self.InvA = np.linalg.inv(self.A)
         trans_mat = scipy.linalg.block_diag(
-            np.kron(np.eye(2), np.r_[affine, [[0, 0, 1]]]),
+            np.kron(np.eye(2), affine),
             affine[:2, :2],
         )
         self.covariance = trans_mat @ self.covariance @ trans_mat.T + self.process_covariance
+
+        ground_delta = self.InvA_orig @ affine @ self.img_pts.T
+        ground_delta /= ground_delta[-1, :]
+
+        self.ground_pts += (self.ground_pts_orig - ground_delta.T)
 
     def update(self, tracks, dets):
         if not len(tracks):
@@ -177,6 +206,7 @@ class Mapper(object):
         meas_size = 2
         state_size = 4
         jacobian = np.zeros((len(tracks) * meas_size, len(tracks) * state_size + 8))
+        # jacobian = np.zeros(((len(tracks) + self.ground_pts.shape[0]) * meas_size, len(tracks) * state_size + 8))
         temp_cov = np.zeros((len(tracks) * state_size + 8, len(tracks) * state_size + 8))
         uv_projs = []
         for t_idx, track in enumerate(tracks):
@@ -214,6 +244,29 @@ class Mapper(object):
             feet_measurements.append(feet)
             measurement_covs.append(cov)
 
+        # for pt_idx, pt in enumerate(self.ground_pts):
+        #     offset = (len(tracks) + pt_idx) * meas_size
+
+        #     xy1 = np.zeros((3, 1))
+        #     xy = pt
+        #     xy1[:2, :] = xy[:2, None]
+        #     xy1[2, :] = 1
+        #     b = np.dot(self.A, xy1)
+        #     gamma = 1 / b[2,:]
+
+        #     uv_proj = b[:2,:] * gamma
+        #     uv_projs.append(uv_proj)
+            
+        #     dU_dA = gamma * np.array([
+        #         [xy1[0, 0], 0, -xy1[0, 0] * uv_proj[0, 0], xy1[1, 0], 0, -uv_proj[0, 0] * xy1[1, 0], 1, 0],
+        #         [0, xy1[0, 0], -xy1[0, 0] * uv_proj[1, 0], 0, xy1[1, 0], -uv_proj[1, 0] * xy1[1, 0], 0, 1]
+        #                             ])
+
+        #     jacobian[offset: offset + meas_size, -8:] = dU_dA
+
+        #     feet_measurements.append(self.img_pts[pt_idx, :2, None])
+        #     measurement_covs.append(np.eye(2) * 16)
+
         temp_cov[-8:, -8:] = self.covariance
         feet_measurements = np.array(feet_measurements)
         measurement_covs = scipy.linalg.block_diag(*measurement_covs)
@@ -236,24 +289,43 @@ class Mapper(object):
         self.covariance = temp_cov[-8:, -8:]
 
         self.process_covariance = self.process_alpha * self.process_covariance + ((1 - self.process_alpha) * kalman_gain @ innov @ innov.T @ kalman_gain.T)[-8:, -8:]
+        # self.process_covariance = (kalman_gain @ innov @ innov.T @ kalman_gain.T)[-8:, -8:]
 
-    def uv2xy(self, uv, sigma_uv):
+    def uv2xy(self, uv, w,h, sigma_uv):
         if self.is_ok == False:
             return None, None
+        
+        # affine = self.A @ self.InvA_orig
+        # affine = np.linalg.inv(affine)
+    
+        # M = affine[:2,:2]
+        # T = np.zeros((2,1))
+        # T[0,0] = affine[0,2]
+        # T[1,0] = affine[1,2]
+
+        # u,v=uv[0,0],uv[1,0]
+        # p_center = np.array([[u],[v-h/2]])
+        # p_wh = np.array([[w],[h]])
+        # p_center = np.dot(M,p_center) + T
+        # p_wh = np.dot(M,p_wh)
+
+        # u = p_center[0,0]
+        # v = p_center[1,0]+p_wh[1,0]/2
 
         uv1 = np.zeros((3, 1))
         uv1[:2,:] = uv
         uv1[2,:] = 1
-        b = np.dot(self.InvA, uv1)
+        b = np.dot(self.InvA_orig, uv1)
         gamma = 1 / b[2,:]
-        dX_dU = gamma * self.InvA[:2, :2] - (gamma**2) * b[:2,:] * self.InvA[2, :2]  # dX/du
+        dX_dU = gamma * self.InvA_orig[:2, :2] - (gamma**2) * b[:2,:] * self.InvA_orig[2, :2]  # dX/du
         xy = b[:2,:] * gamma
 
-        dU_dA = gamma * np.array([
-            [xy[0, 0], 0, -xy[0, 0] * uv[0, 0], xy[1, 0], 0, -uv[0, 0] * xy[1, 0], 1, 0],
-            [0, xy[0, 0], -xy[0, 0] * uv[1, 0], 0, xy[1, 0], -uv[1, 0] * xy[1, 0], 0, 1]
-                                  ])  # du/dA
-        dX_dA = dX_dU @ dU_dA
+        # gamma2 = 1 / (np.dot(self.A[-1, :2], xy[:, 0]) + 1)
+        # dU_dA = gamma2 * np.array([
+        #     [xy[0, 0], 0, -xy[0, 0] * uv[0, 0], xy[1, 0], 0, -uv[0, 0] * xy[1, 0], 1, 0],
+        #     [0, xy[0, 0], -xy[0, 0] * uv[1, 0], 0, xy[1, 0], -uv[1, 0] * xy[1, 0], 0, 1]
+        #                           ])  # du/dA
+        # dX_dA = dX_dU @ dU_dA
 
         sigma_xy = np.dot(np.dot(dX_dU, sigma_uv), dX_dU.T) #+ np.dot(np.dot(dX_dA, self.covariance), dX_dA.T)
         return xy, sigma_xy

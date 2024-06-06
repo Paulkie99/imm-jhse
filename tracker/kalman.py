@@ -46,6 +46,10 @@ class KalmanTracker(object):
         self.kf.x[3] = 0
         self.kf.x[4:, 0] = H
 
+        self.A_orig = np.r_[H, [1]].reshape((3, 3)).T
+        self.A = self.A_orig.copy()
+        self.InvA_orig = np.linalg.inv(self.A_orig)
+
         self.id = KalmanTracker.count
         KalmanTracker.count += 1
         self.age = 0
@@ -97,6 +101,7 @@ class KalmanTracker(object):
         self.A = np.r_[self.kf.x[-8:, 0], [1]].reshape((3, 3)).T
         self.InvA = np.linalg.inv(self.A)
 
+        # self.kf.Q = self.alpha * self.kf.Q + ((1 - self.alpha) * kalman_gain @ diff @ diff.T @ kalman_gain.T)
         self.kf.Q[-8:, -8:] = self.alpha * self.kf.Q[-8:, -8:] + ((1 - self.alpha) * kalman_gain @ diff @ diff.T @ kalman_gain.T)[-8:, -8:]
 
     def predict(self, affine):
@@ -111,54 +116,28 @@ class KalmanTracker(object):
 
         self.age += 1
 
+        b = np.dot(self.A, np.array([[self.kf.x[0, 0]], [self.kf.x[2, 0]], [1]]))
+
         self.A = np.r_[self.kf.x[-8:, 0], [1]].reshape((3, 3)).T
         self.InvA = np.linalg.inv(self.A)
 
-        # A = self.A
+        uv = b / b[-1, 0]
 
-        # xy = self.kf.x[[0, 2], :]
-        # xy1 = np.ones((3, 1))
-        # xy1[:2, :] = xy
+        M = affine[:,:2]
+        T = np.zeros((2,1))
+        T[0,0] = affine[0,2]
+        T[1,0] = affine[1,2]
 
-        # u,v,w,h = self.last_box.foot_x, self.last_box.foot_y, self.last_box.bb_width, self.last_box.bb_height
+        u,v=uv[0,0],uv[1,0]
+        w,h = self.last_box.bb_width, self.last_box.bb_height
+        p_center = np.array([[u],[v-h/2]])
+        p_wh = np.array([[w],[h]])
+        p_center = np.dot(M,p_center) + T
+        p_wh = np.dot(M,p_wh)
 
-        # M = affine[:,:2]
-        # T = np.zeros((2,1))
-        # T[0,0] = affine[0,2]
-        # T[1,0] = affine[1,2]
-
-        # p_center = np.array([[u],[v-h/2]])
-        # p_wh = np.array([[w],[h]])
-        # p_center = np.dot(M,p_center) + T
-        # p_wh = np.dot(M,p_wh)
-
-        # u = p_center[0,0]
-        # v = p_center[1,0]+p_wh[1,0]/2
-
-        # self.last_box.foot_x, self.last_box.foot_y, self.last_box.bb_width, self.last_box.bb_height - u, v, p_wh[0, 0], p_wh[1, 0]
-
-        # b = A @ xy1
-        # gamma = 1 / b[2,:]
-        # uv_proj = b[:2,:] * gamma
-
-        # dU_dX = np.zeros((2, self.kf.dim_x))
-        # dU_dX[:, [0, 2]] = gamma * A[:2, :2] - (gamma**2) * b[:2,:] * A[2, :2]
-
-        # diff = np.array([[u],[v]]) - uv_proj
-
-        # S = np.dot(dU_dX, np.dot(self.kf.P,dU_dX.T)) + self.last_box.R
-        # SI = np.linalg.inv(S)
-
-        # kalman_gain = self.kf.P @ dU_dX.T @ SI
-
-        # self.kf.x = self.kf.x + kalman_gain @ diff
-        # self.kf.P = (np.eye(self.kf.P.shape[0]) - kalman_gain @ dU_dX) @ self.kf.P
-
-        # Shouldn't change?
-        # self.A = np.r_[self.kf.x[-8:, 0], [1]].reshape((3, 3)).T
-        # self.InvA = np.linalg.inv(self.A)
-
-        # self.kf.Q = self.alpha * self.kf.Q + ((1 - self.alpha) * kalman_gain @ diff @ diff.T @ kalman_gain.T)
+        u = p_center[0,0]
+        v = p_center[1,0]+p_wh[1,0]/2
+        self.last_box.foot_x, self.last_box.foot_y, self.last_box.bb_width, self.last_box.bb_height = u,v,p_wh[0,0],p_wh[1,0]
 
         return np.dot(self.kf.H, self.kf.x)
 
@@ -169,16 +148,17 @@ class KalmanTracker(object):
         uv1 = np.zeros((3, 1))
         uv1[:2,:] = uv
         uv1[2,:] = 1
-        b = np.dot(self.InvA, uv1)
+        b = np.dot(self.InvA_orig, uv1)
         gamma = 1 / b[2,:]
-        dX_dU = gamma * self.InvA[:2, :2] - (gamma**2) * b[:2,:] * self.InvA[2, :2]  # dX/du
+        dX_dU = gamma * self.InvA_orig[:2, :2] - (gamma**2) * b[:2,:] * self.InvA_orig[2, :2]  # dX/du
         xy = b[:2,:] * gamma
 
-        dU_dA = gamma * np.array([
-            [xy[0, 0], 0, -xy[0, 0] * uv[0, 0], xy[1, 0], 0, -uv[0, 0] * xy[1, 0], 1, 0],
-            [0, xy[0, 0], -xy[0, 0] * uv[1, 0], 0, xy[1, 0], -uv[1, 0] * xy[1, 0], 0, 1]
-                                  ])  # du/dA
-        dX_dA = dX_dU @ dU_dA
+        # gamma2 = 1 / (np.dot(self.A[-1, :2], xy[:, 0]) + 1)
+        # dU_dA = gamma2 * np.array([
+        #     [xy[0, 0], 0, -xy[0, 0] * uv[0, 0], xy[1, 0], 0, -uv[0, 0] * xy[1, 0], 1, 0],
+        #     [0, xy[0, 0], -xy[0, 0] * uv[1, 0], 0, xy[1, 0], -uv[1, 0] * xy[1, 0], 0, 1]
+        #                           ])  # du/dA
+        # dX_dA = dX_dU @ dU_dA
 
         sigma_xy = np.dot(np.dot(dX_dU, sigma_uv), dX_dU.T) #+ np.dot(np.dot(dX_dA, self.kf.P[-8:, -8:]), dX_dA.T)
         return xy, sigma_xy
@@ -196,7 +176,7 @@ class KalmanTracker(object):
         sigma_uv[1,1] = v_err*v_err
         return uv, sigma_uv
     
-    def distance(self, y, R):
+    def distance(self, y, R, affine):
         # A = self.A
 
         # xy = self.kf.x[[0, 2], :]
@@ -205,6 +185,7 @@ class KalmanTracker(object):
 
         # b = A @ xy1
         # gamma = 1 / b[2,:]
+        # # uv_proj = np.array([[self.last_box.foot_x],[self.last_box.foot_y]])
         # uv_proj = b[:2,:] * gamma
 
         # dU_dA = gamma * np.array([
@@ -229,7 +210,7 @@ class KalmanTracker(object):
         # except (RuntimeWarning, LinAlgError):
         #     logdet = 6000
         # logdet[np.isnan(logdet)] = 6000
-        # return mahalanobis.squeeze() + logdet / 6
+        # return mahalanobis.squeeze() + logdet
         xy = []
         Rs = []
         for idx in range(len(y)):
@@ -237,10 +218,29 @@ class KalmanTracker(object):
             xy.append(xy_)
             Rs.append(R_)
         jacobian = np.zeros((2, self.kf.dim_x))
-        jacobian[:, [0, 2]] = np.eye(2)
-        
-        diff = np.array(xy) - self.kf.x[[0, 2], :]
 
+
+        b = np.dot(self.A, np.array([[self.kf.x[0, 0]], [self.kf.x[2, 0]], [1]]))
+        uv = b / b[-1, 0]  # image proj
+        gamma = 1 / b[2, :]  # gamma to image
+        dU_dX = gamma * self.A[:2, :2] - (gamma**2) * b[:2,:] * self.A[2, :2]
+
+        self_xy = np.array([[self.kf.x[0, 0]],
+                            [self.kf.x[2, 0]]])
+        dU_dA = gamma * np.array([
+            [self_xy[0, 0], 0, -self_xy[0, 0] * uv[0, 0], self_xy[1, 0], 0, -uv[0, 0] * self_xy[1, 0], 1, 0],
+            [0, self_xy[0, 0], -self_xy[0, 0] * uv[1, 0], 0, self_xy[1, 0], -uv[1, 0] * self_xy[1, 0], 0, 1]
+                                  ])  # du/dA
+        
+        b = self.InvA_orig @ uv  # ground plane coords with H_L
+        self_xy = b / b[-1, 0]
+        gamma = 1 / b[2, :]
+        dX_dU = gamma * self.InvA_orig[:2, :2] - (gamma**2) * b[:2,:] * self.InvA_orig[2, :2]  # dX/du
+
+        jacobian[:, [0, 2]] = dX_dU @ dU_dX
+        jacobian[:, -8:] = dX_dU @ dU_dA
+
+        diff = np.array(xy) - self_xy[:2, :]        
         S = np.dot(jacobian, np.dot(self.kf.P,jacobian.T)) + np.array(Rs)
         SI = np.linalg.inv(S)
         mahalanobis = diff.transpose(0, 2, 1) @ SI @ diff
