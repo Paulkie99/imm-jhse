@@ -83,10 +83,9 @@ class UCMCTrack(object):
             cost_matrix = np.zeros((num_det, num_trk))
             det_ys = [dets[det_idx].y for det_idx in detidx_high]
             det_covs = [dets[det_idx].R for det_idx in detidx_high]
-            det_ws = [dets[det_idx].bb_width for det_idx in detidx_high]
             for j in range(num_trk):
                 trk_idx = trackidx[j]
-                cost_matrix[:,j] = self.trackers[trk_idx].distance(det_ys, det_covs, det_ws)
+                cost_matrix[:,j] = self.trackers[trk_idx].distance(det_ys, det_covs)
                 
             matched_indices,unmatched_a,unmatched_b = linear_assignment(cost_matrix, self.a1)
             
@@ -98,7 +97,7 @@ class UCMCTrack(object):
             for i,j in matched_indices:
                 det_idx = detidx_high[i]
                 trk_idx = trackidx[j]
-                self.trackers[trk_idx].update(dets[det_idx].y, dets[det_idx].R, dets[det_idx].bb_width)
+                self.trackers[trk_idx].update(dets[det_idx].y, dets[det_idx].R)
                 self.trackers[trk_idx].death_count = 0
                 self.trackers[trk_idx].detidx = det_idx
                 self.trackers[trk_idx].R = dets[det_idx].R
@@ -117,10 +116,9 @@ class UCMCTrack(object):
             cost_matrix = np.zeros((num_det, num_trk))
             det_ys = [dets[det_idx].y for det_idx in detidx_low]
             det_covs = [dets[det_idx].R for det_idx in detidx_low]
-            det_ws = [dets[det_idx].bb_width for det_idx in detidx_low]
             for j in range(num_trk):
                 trk_idx = trackidx_remain[j]
-                cost_matrix[:,j] = self.trackers[trk_idx].distance(det_ys, det_covs, det_ws)
+                cost_matrix[:,j] = self.trackers[trk_idx].distance(det_ys, det_covs)
             matched_indices,unmatched_a,unmatched_b = linear_assignment(cost_matrix,self.a2)
             
             for i in unmatched_b:
@@ -132,7 +130,7 @@ class UCMCTrack(object):
             for i,j in matched_indices:
                 det_idx = detidx_low[i]
                 trk_idx = trackidx_remain[j]
-                self.trackers[trk_idx].update(dets[det_idx].y, dets[det_idx].R, dets[det_idx].bb_width)       
+                self.trackers[trk_idx].update(dets[det_idx].y, dets[det_idx].R)       
                 self.trackers[trk_idx].death_count = 0
                 self.trackers[trk_idx].detidx = det_idx
                 self.trackers[trk_idx].R = dets[det_idx].R
@@ -146,18 +144,17 @@ class UCMCTrack(object):
         cost_matrix = np.zeros((num_det, num_trk))
         det_ys = [dets[det_idx].y for det_idx in self.detidx_remain]
         det_covs = [dets[det_idx].R for det_idx in self.detidx_remain]
-        det_ws = [dets[det_idx].bb_width for det_idx in self.detidx_remain]
         if len(det_ys):
             for j in range(num_trk):
                 trk_idx = self.tentative_idx[j]
-                cost_matrix[:,j] = self.trackers[trk_idx].distance(det_ys, det_covs, det_ws)
+                cost_matrix[:,j] = self.trackers[trk_idx].distance(det_ys, det_covs)
             
         matched_indices,unmatched_a,unmatched_b = linear_assignment(cost_matrix,self.a1)
 
         for i,j in matched_indices:
             det_idx = self.detidx_remain[i]
             trk_idx = self.tentative_idx[j]
-            self.trackers[trk_idx].update(dets[det_idx].y, dets[det_idx].R, dets[det_idx].bb_width)
+            self.trackers[trk_idx].update(dets[det_idx].y, dets[det_idx].R)
             self.trackers[trk_idx].death_count = 0
             self.trackers[trk_idx].birth_count += 1
             self.trackers[trk_idx].detidx = det_idx

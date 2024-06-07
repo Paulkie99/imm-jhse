@@ -8,14 +8,14 @@ import scipy.linalg
 def getUVError(box):
     u, v = 0.05 * box[2], 0.05 * box[3]
 
-    if u>13:
-        u = 13
-    elif u<2:
-        u = 2
-    if v>10:
-        v = 10
-    elif v<2:
-        v = 2
+    # if u>13:
+    #     u = 13
+    # elif u<2:
+    #     u = 2
+    # if v>10:
+    #     v = 10
+    # elif v<2:
+    #     v = 2
     return u,v
     
 
@@ -112,7 +112,7 @@ class Mapper(object):
 
         self.covariance = np.eye(8) * 0
 
-        self.process_covariance = np.eye(8) * 1e-3 # * (720 / frame_height)**2 * (0.04 / dt)**2
+        self.process_covariance = np.eye(8) * 1e-3 * ((dt / 0.04)**2) / ((1 / 14 / 0.04)**2)
 
     def uv2xy(self, uv, sigma_uv):
         if self.is_ok == False:

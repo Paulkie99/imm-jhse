@@ -1,3 +1,4 @@
+import scipy
 from .mapper import Mapper
 from .gmc import GMCLoader
 import numpy as np
@@ -98,8 +99,9 @@ class Detector:
         dets = [det for det in dets if det.det_class == det_class and det.conf >= conf_thresh]
 
         for det in dets:
-            # det.y,det.R = self.mapper.mapto(det.get_box())
             det.y,det.R = self.mapper.get_UV_and_error(det.get_box())
+            y, R = self.mapper.uv2xy(det.y, det.R)
+            det.y, det.R = np.r_[y, det.y, [[det.bb_width]]], scipy.linalg.block_diag(R, det.R)
         return dets
 
     def cmc(self,x,y,w,h,frame_id):
