@@ -5,8 +5,8 @@ import scipy
 import scipy.linalg
 
 
-def getUVError(box):
-    u, v = 0.1 * box[2], 0.1 * box[3]
+def getUVError(box, sigma_m=0.05):
+    u, v = sigma_m * box[2], sigma_m * box[3]
 
     # if u>13:
     #     u = 13
@@ -91,7 +91,8 @@ def readCamParaFile(camera_para):
     return Ki,Ko,True
 
 class Mapper(object):
-    def __init__(self, campara_file,dataset= "kitti",process_alpha=0,noise_degree=0,frame_width=1920,frame_height=1080,dt=1/30):
+    sigma_m = 0.05
+    def __init__(self, campara_file,dataset= "kitti",process_alpha=0,noise_degree=0,frame_width=1920,frame_height=1080,dt=1/30,sigma_m=0.05):
         self.A = np.zeros((3, 3))
         if dataset == "kitti":
             self.KiKo, self.is_ok = readKittiCalib(campara_file)
@@ -112,7 +113,9 @@ class Mapper(object):
 
         self.covariance = np.eye(8) * 0
 
-        self.process_covariance = np.eye(8) * 1e-3 * ((dt / (1/14))**2) / process_alpha
+        self.process_covariance = np.eye(8) * 1e-3 * ((dt / (1/14))**2) * 10 ** process_alpha
+
+        self.sigma_m = sigma_m
 
     def uv2xy(self, uv, sigma_uv):
         if self.is_ok == False:
@@ -146,7 +149,7 @@ class Mapper(object):
 
     def get_UV_and_error(self, box):
         uv = np.array([[box[0]+box[2]/2], [box[1]+box[3]]])
-        u_err,v_err = getUVError(box)
+        u_err,v_err = getUVError(box, self.sigma_m)
         sigma_uv = np.identity(3)
         sigma_uv[0,0] = u_err*u_err
         sigma_uv[1,1] = v_err*v_err

@@ -6,7 +6,7 @@ from enum import Enum
 import scipy
 import scipy.linalg
 
-from detector.mapper import getUVError 
+from detector.mapper import Mapper, getUVError 
 
 class TrackStatus(Enum):
     Tentative = 0
@@ -350,7 +350,7 @@ class KalmanTracker(object):
 
     def get_UV_and_error(self, box):
         uv = np.array([[box[0]+box[2]/2], [box[1]+box[3]]])
-        u_err,v_err = getUVError(box)
+        u_err,v_err = getUVError(box, Mapper.sigma_m)
         sigma_uv = np.identity(2)
         sigma_uv[0,0] = u_err*u_err
         sigma_uv[1,1] = v_err*v_err

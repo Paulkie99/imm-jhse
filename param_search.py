@@ -63,7 +63,7 @@ def run_param_search(x,
                         dataset = "MOT17"):
     
     print(f"params: {x}")
-    wx, wy, a, vmax = x
+    wx, wy, a, vmax, P, sigma_m = x
 
     if os.path.exists(out_path):
         shutil.rmtree(out_path)
@@ -93,7 +93,7 @@ def run_param_search(x,
     f_height=1080
 
     detector = Detector(args.add_cam_noise, args.frame_width, args.frame_height, 1/args.fps)
-    detector.load(cam_para, det_file,gmc_file,args.P)
+    detector.load(cam_para, det_file,gmc_file,P,sigma_m)
     print(f"seq_length = {detector.seq_length}")
 
     a1 = a
@@ -190,15 +190,15 @@ if __name__ == '__main__':
     obj = [
         obj_func
     ]
-    n_var = 4
+    n_var = 6
 
     # vars
-    # wx, wy, a, process_cov_alpha, vmax
+    # wx, wy, a, vmax, P, sigma_m
     problem = FunctionalProblem(
         n_var,
         obj,
-        xl=np.array([0.001, 0.001, 7,   0.001]),
-        xu=np.array([5,     5,     100, 3])
+        xl=np.array([0.001, 0.001, 7,   0.001, -9, 0.01]),
+        xu=np.array([5,     5,     100, 3,      3,   0.3])
     )
     # problem = FunctionalProblem(
     #     n_var,
@@ -207,7 +207,7 @@ if __name__ == '__main__':
     #     xu=np.array([100,1])
     # )
 
-    algorithm = PatternSearch(x0=np.array([args.wx, args.wy, args.a, args.vmax]),
+    algorithm = PatternSearch(x0=np.array([args.wx, args.wy, args.a, args.vmax, args.P, 0.05]),
                               init_delta=0.75)
     # algorithm = PatternSearch(x0=np.array([args.a, args.P]),
     #                           init_delta=0.5)
@@ -232,7 +232,7 @@ if __name__ == '__main__':
             self.F.set(algorithm.pop.get("F"))
 
     res = minimize(problem, algorithm, 
-                   get_termination("n_eval", 100),
+                   get_termination("n_eval", 300),
                    output=MyOutput(),
                    verbose=True, seed=1)
-    print(f"Best solution: \nwx={res.X[0]}\nwy={res.X[1]}\na={res.X[2]}\nvmax={res.X[3]}\nOBJ={res.F}")
+    print(f"Best solution: \nwx={res.X[0]}\nwy={res.X[1]}\na={res.X[2]}\nvmax={res.X[3]}\P={res.X[4]}\sigma_m={res.X[5]}\nOBJ={res.F}")
