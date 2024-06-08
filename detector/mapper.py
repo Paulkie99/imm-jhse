@@ -112,7 +112,7 @@ class Mapper(object):
 
         self.covariance = np.eye(8) * 0
 
-        self.process_covariance = np.eye(8) * 1e-3 * ((dt / 0.04)**2) / ((1 / 14 / 0.04)**2)
+        self.process_covariance = np.eye(8) * 1e-3 * ((dt / (1/14))**2)
 
     def uv2xy(self, uv, sigma_uv):
         if self.is_ok == False:
