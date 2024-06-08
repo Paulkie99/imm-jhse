@@ -40,22 +40,22 @@ class KalmanTracker(object):
     count = 1
     img_filter_indices = [StateIndex.xc.value, StateIndex.vxc.value, StateIndex.yc.value, StateIndex.vyc.value, StateIndex.w.value, StateIndex.vw.value, StateIndex.h.value, StateIndex.vh.value]
     ground_filter_indices = [StateIndex.xl.value, StateIndex.vxl.value, StateIndex.yl.value, StateIndex.vyl.value, StateIndex.h1.value, StateIndex.h4.value, StateIndex.h7.value, StateIndex.h2.value, StateIndex.h5.value, StateIndex.h8.value, StateIndex.h3.value, StateIndex.h6.value]
-    common_ground_indices = [StateIndex.xl.value, StateIndex.yl.value]
-    a_s = [-100, -10, -100, -10, -10e3, -150, -6e3, -150, 20, -50, 20, -50, -100, -100, -100, -100, -100, -100, -10e3, -6e3]
-    b_s = [100,   10,  100,  10,  10e3,  150,  6e3,  150, 300, 50, 500, 50,  100,  100,  100,  100,  100,  100,  10e3,  6e3]
+    # common_ground_indices = [StateIndex.xl.value, StateIndex.yl.value]
+    # a_s = [-100, -10, -100, -10, -10e3, -150, -6e3, -150, 20, -50, 20, -50, -100, -100, -100, -100, -100, -100, -10e3, -6e3]
+    # b_s = [100,   10,  100,  10,  10e3,  150,  6e3,  150, 300, 50, 500, 50,  100,  100,  100,  100,  100,  100,  10e3,  6e3]
 
-    aug_means = (np.asarray(a_s) + np.asarray(b_s)) / 2
-    aug_covs = np.square(np.asarray(b_s) - np.asarray(a_s)) / 12
+    # aug_means = (np.asarray(a_s) + np.asarray(b_s)) / 2
+    # aug_covs = np.square(np.asarray(b_s) - np.asarray(a_s)) / 12
 
     d_feet_d_img = np.array(  # xc, vxc, yc, vyc, w, vw, h, vh
             [[1, 0, 0, 0, 0, 0, 0, 0,],
              [0, 0, 1, 0, 0, 0, 0.5, 0]]
         )
     
-    d_img_d_feet = np.array(
-        [[1, 0, 0, 0, 0, 0,  0,  0,],
-         [0, 0, 1, 0, 0, 0, -0.5,0]]
-    ).T
+    # d_img_d_feet = np.array(
+    #     [[1, 0, 0, 0, 0, 0,  0,  0,],
+    #      [0, 0, 1, 0, 0, 0, -0.5,0]]
+    # ).T
 
     def __init__(self, det, wx, wy, vmax,dt=1/30,H=None,H_P=None,H_Q=None,alpha_cov=1):
         # xl, vxl, yl, vyl, xc, vxc, yc, vyc, w, vw, h, vh, h1, h4, h7, h2, h5, h8, h3, h6
@@ -127,68 +127,19 @@ class KalmanTracker(object):
         self.dt = dt
 
         # Reference https://github.com/rlabbe/filterpy/blob/master/filterpy/kalman/IMM.py#L227
-        mu = [0.9, 0.1]  # filter proba: ground, img
-        self.mu = np.assarray(mu) / np.sum(mu)
+        mu = [0.5, 0.5]  # filter proba: ground, img
+        self.mu = np.asarray(mu) / np.sum(mu)
         #M[i,j] is the probability of switching from filter j to filter i.
         self.M = np.array(
-            [[0.9, 0.1],
-             [0.4, 0.6]]
+            [[0.7, 0.3],
+             [0.3, 0.7]]
         )
         self.N = 2  # number of filters
         self.likelihood = np.zeros(self.N)
         # omega[i, j] is the probabilility of mixing the state of filter i into filter j
         self.omega = np.zeros((self.N, self.N))
 
-        self.mixed_x = np.zeros_like(self.kf.x)
-        self.mixed_P = np.zeros_like(self.kf.P)
-        self.x_ground_aug = np.zeros_like(self.kf.x)
-        self.x_img_aug = np.zeros_like(self.kf.x)
-
         self._compute_mixing_probabilities()
-        # initialize imm state estimate based on current filters
-        self._compute_state_estimate()
-
-    def _compute_state_estimate(self):
-        self.mixed_x = np.zeros_like(self.kf.x)
-        self.mixed_P = np.zeros_like(self.kf.P)
-
-        self.x_ground_aug = np.zeros_like(self.kf.x)
-        self.x_img_aug = np.zeros_like(self.kf.x)
-
-        # Augment missing states of each filter with gaussian approximation of uniform dist.
-        self.x_ground_aug[self.ground_filter_indices, :] = self.kf.x[self.ground_filter_indices, :]
-        self.x_ground_aug[self.img_filter_indices, :] = self.aug_means[self.img_filter_indices, :]
-        self.cov_ground_aug = self.kf.P.copy()
-        self.cov_ground_aug[4:-8, 4:-8] = 0
-        self.cov_ground_aug[self.img_filter_indices, self.img_filter_indices] = self.aug_covs[self.img_filter_indices, self.img_filter_indices]
-
-        self.x_img_aug[self.img_filter_indices, :] = self.kf.x[self.img_filter_indices, :]
-        self.x_img_aug[self.ground_filter_indices, :] = self.aug_means[self.ground_filter_indices, :]
-        self.cov_img_aug = self.kf.P.copy()
-        self.cov_img_aug[:4, :4] = 0
-        self.cov_img_aug[-8:, -8:] = 0
-        self.cov_img_aug[self.ground_filter_indices, self.ground_filter_indices] = self.aug_covs[self.ground_filter_indices, self.ground_filter_indices]
-
-        # Transform states so that they can be mixed
-        ground_to_feet, P_ground_to_feet, jac_ground_to_feet = self.xy2uv(self.x_ground_aug[[StateIndex.xl.value, StateIndex.yl.value], :], 
-                                                                          self.cov_ground_aug[self.ground_filter_indices, :][:, self.ground_filter_indices])
-
-        feet_to_ground, P_feet_to_ground, jac_feet_to_ground = self.uv2xy(self.x_img_aug[[StateIndex.xc.value, StateIndex.yc.value], :] + np.asarray([[0], [self.x_img_aug[StateIndex.h.value, 0]]]) / 2,
-                                                                          self.d_feet_d_img @ self.cov_img_aug[self.img_filter_indices, :][:, self.img_filter_indices] @ self.d_feet_d_img.T)
-
-
-        """
-        Computes the IMM's mixed state estimate from each filter using
-        the the mode probability self.mu to weight the estimates.
-        """
-        self.x.fill(0)
-        for f, mu in zip(self.filters, self.mu):
-            self.x += f.x * mu
-
-        self.P.fill(0)
-        for f, mu in zip(self.filters, self.mu):
-            y = f.x - self.x
-            self.P += mu * (np.outer(y, y) + f.P)
 
     def _compute_mixing_probabilities(self):
         """
@@ -215,8 +166,8 @@ class KalmanTracker(object):
             [xy[0, 0], 0, -xy[0, 0] * uv_proj[0, 0], xy[1, 0], 0, -uv_proj[0, 0] * xy[1, 0], 1, 0],
             [0, xy[0, 0], -xy[0, 0] * uv_proj[1, 0], 0, xy[1, 0], -uv_proj[1, 0] * xy[1, 0], 0, 1]
                                   ])
-        
-        dU_dX = gamma * A[:2, :2] - (gamma**2) * b[:2,:] * A[2, :2]
+        dU_dX = np.zeros((2, 4))
+        dU_dX[:, [0, 2]] = gamma * A[:2, :2] - (gamma**2) * b[:2,:] * A[2, :2]
 
         jac = np.c_[dU_dX, dU_dA]
 
@@ -240,8 +191,6 @@ class KalmanTracker(object):
         xy = self.kf.x[[0, 2], :]
         xy1 = np.ones((3, 1))
         xy1[:2, :] = xy
-
-        uv = y
 
         b = A @ xy1
         gamma = 1 / b[2,:]
@@ -268,66 +217,84 @@ class KalmanTracker(object):
 
         diff = np.r_[y[2:4], y[2:]] - np.r_[uv_proj, uv_proj, self.kf.x[[StateIndex.w.value], :]]
 
-        S = np.dot(jacobian, np.dot(self.kf.P,jacobian.T)) + scipy.linalg.block_diag(R[2:4, 2:4], R[2:, 2:])
-        SI = np.linalg.inv(S)
+        S_0 = np.dot(jacobian[:2], np.dot(self.kf.P,jacobian[:2].T)) + R[2:4, 2:4]
+        SI_0 = np.linalg.inv(S_0)
 
-        kalman_gain = self.kf.P @ jacobian.T @ SI
+        S_1 = np.dot(jacobian[2:], np.dot(self.kf.P,jacobian[2:].T)) + R[2:, 2:]
+        SI_1 = np.linalg.inv(S_1)
 
-        # print(np.isclose(self.kf.x[:4], (self.kf.x + kalman_gain @ (homog[:, None] - proj))[:4]).all())
-        self.kf.x = self.kf.x + kalman_gain @ diff
-        self.kf.P = (np.eye(self.kf.P.shape[0]) - kalman_gain @ jacobian) @ self.kf.P
+        # update mode probabilities from total probability * likelihood
+        self.likelihood[0] = np.exp(
+            -0.5 * (np.log(np.linalg.det(2*np.pi*S_0)) + diff[:2].T@SI_0@diff[:2])
+        )
+        self.likelihood[1] = np.exp(
+            -0.5 * (np.log(np.linalg.det(2*np.pi*S_1)) + diff[2:].T@SI_1@diff[2:])
+        )
+        self.mu = self.cbar * self.likelihood
+        self.mu /= np.sum(self.mu)  # normalize
+
+        self._compute_mixing_probabilities()
+
+        kalman_gain = self.kf.P @ jacobian[:2].T @ SI_0
+
+        self.kf.x = self.kf.x + kalman_gain @ diff[:2]
+        self.kf.P = (np.eye(self.kf.P.shape[0]) - kalman_gain @ jacobian[:2]) @ self.kf.P
+
+        kalman_gain = self.kf.P @ jacobian[2:].T @ SI_1
+
+        self.kf.x = self.kf.x + kalman_gain @ diff[2:]
+        self.kf.P = (np.eye(self.kf.P.shape[0]) - kalman_gain @ jacobian[2:]) @ self.kf.P
 
         self.A = np.r_[self.kf.x[-8:, 0], [1]].reshape((3, 3)).T
         self.InvA = np.linalg.inv(self.A)
-
-        # self.kf.Q = self.alpha * self.kf.Q + ((1 - self.alpha) * kalman_gain @ diff @ diff.T @ kalman_gain.T)
-        self.kf.Q[-8:, -8:] = self.alpha * self.kf.Q[-8:, -8:] + ((1 - self.alpha) * kalman_gain @ diff @ diff.T @ kalman_gain.T)[-8:, -8:]
 
     def compute_mixed_initial(self):
         # compute mixed initial conditions
 
         # Augment missing states of each filter with gaussian approximation of uniform dist.
-        self.x_ground_aug[self.ground_filter_indices, :] = self.kf.x[self.ground_filter_indices, :]
-        self.x_ground_aug[self.img_filter_indices, :] = self.aug_means[self.img_filter_indices, :]
+        x_ground_aug = self.kf.x.copy()
         self.cov_ground_aug = self.kf.P.copy()
-        self.cov_ground_aug[4:-8, 4:-8] = 0
-        self.cov_ground_aug[self.img_filter_indices, self.img_filter_indices] = self.aug_covs[self.img_filter_indices, self.img_filter_indices]
 
-        self.x_img_aug[self.img_filter_indices, :] = self.kf.x[self.img_filter_indices, :]
-        self.x_img_aug[self.ground_filter_indices, :] = self.aug_means[self.ground_filter_indices, :]
+        x_img_aug = self.kf.x.copy()
         self.cov_img_aug = self.kf.P.copy()
-        self.cov_img_aug[:4, :4] = 0
-        self.cov_img_aug[-8:, -8:] = 0
-        self.cov_img_aug[self.ground_filter_indices, self.ground_filter_indices] = self.aug_covs[self.ground_filter_indices, self.ground_filter_indices]
 
         # Transform states so that they can be mixed
-        ground_to_feet, P_d_feet_d_ground, jac_d_feet_d_ground = self.xy2uv(self.x_ground_aug[[StateIndex.xl.value, StateIndex.yl.value], :], 
+        ground_to_feet, P_d_feet_d_ground, jac_d_feet_d_ground = self.xy2uv(x_ground_aug[[StateIndex.xl.value, StateIndex.yl.value], :], 
                                                                     self.cov_ground_aug[self.ground_filter_indices, :][:, self.ground_filter_indices])
-        P_d_img_d_ground = self.d_img_d_feet @ P_d_feet_d_ground @ self.d_img_d_feet.T  # 8x8
-        self.x_ground_aug[[StateIndex.xc.value, StateIndex.yc.value, StateIndex.h.value], :] = np.array([[ground_to_feet[0, 0]], [ground_to_feet[1, 0] - self.x_img_aug[StateIndex.h.value, 0] / 2], [self.x_img_aug[StateIndex.h.value, 0]]])
-        self.cov_ground_aug[4:-8]
+        P_d_img_d_ground = P_d_feet_d_ground # self.d_img_d_feet @ P_d_feet_d_ground @ self.d_img_d_feet.T  # 8x8
+        x_ground_aug[StateIndex.xc.value, :] = ground_to_feet[0, :]
+        self.cov_ground_aug[StateIndex.xc.value, StateIndex.xc.value] = P_d_img_d_ground[0, 0]
 
-        feet_to_ground, P_d_ground_d_img, jac_d_ground_d_img = self.uv2xy(self.x_img_aug[[StateIndex.xc.value, StateIndex.yc.value], :] + np.asarray([[0], [self.x_img_aug[StateIndex.h.value, 0]]]) / 2,
+        feet_to_ground, P_d_ground_d_img, jac_d_ground_d_img = self.uv2xy(x_img_aug[[StateIndex.xc.value, StateIndex.yc.value], :] + np.asarray([[0], [x_img_aug[StateIndex.h.value, 0]]]) / 2,
                                                                           self.d_feet_d_img @ self.cov_img_aug[self.img_filter_indices, :][:, self.img_filter_indices] @ self.d_feet_d_img.T)
+        x_img_aug[[StateIndex.xl.value, StateIndex.yl.value], :] = feet_to_ground
+        self.cov_img_aug[[StateIndex.xl.value, StateIndex.yl.value], StateIndex.xl.value] = P_d_ground_d_img[:, 0]
+        self.cov_img_aug[[StateIndex.xl.value, StateIndex.yl.value], StateIndex.yl.value] = P_d_ground_d_img[:, 1]
 
         # Mix
+        omega = self.omega.T
         
+        new_x_ground_aug = omega[0, 0] * x_ground_aug + omega[0, 1] * x_img_aug
+        y1, y2 = x_ground_aug - new_x_ground_aug, x_img_aug - new_x_ground_aug
+        new_cov_ground_aug = omega[0, 0] * (np.outer(y1, y1) + self.cov_ground_aug) + omega[0, 1] * (np.outer(y2, y2) + self.cov_img_aug)
+
+        new_x_img_aug = omega[1, 0] * x_ground_aug + omega[1, 1] * x_img_aug
+        y1, y2 = x_ground_aug - new_x_img_aug, x_img_aug - new_x_img_aug
+        new_cov_img_aug = omega[1, 0] * (np.outer(y1, y1) + self.cov_ground_aug) + omega[1, 1] * (np.outer(y2, y2) + self.cov_img_aug)
         
-        for i, (f, w) in enumerate(zip(self.filters, self.omega.T)):
-            x = zeros(self.x.shape)
-            for kf, wj in zip(self.filters, w):
-                x += kf.x * wj
-            xs.append(x)
+        if np.isnan(new_x_ground_aug).any():
+            print()
 
-            P = zeros(self.P.shape)
-            for kf, wj in zip(self.filters, w):
-                y = kf.x - x
-                P += wj * (outer(y, y) + kf.P)
-            Ps.append(P)
+        self.kf.x[self.ground_filter_indices, :] = new_x_ground_aug[self.ground_filter_indices, :]
+        self.kf.x[self.img_filter_indices, :] = new_x_img_aug[self.img_filter_indices, :]
 
+        for idx in self.ground_filter_indices:
+            self.kf.P[idx] = new_cov_ground_aug[idx]
+        for idx in self.img_filter_indices:
+            self.kf.P[idx] = new_cov_img_aug[idx]
 
     def predict(self, affine):
-        self.compute_mixed_initial()
+        # self.compute_mixed_initial()
 
         self.kf.F = scipy.linalg.block_diag(
             *(
@@ -390,8 +357,6 @@ class KalmanTracker(object):
         return uv, sigma_uv
     
     def distance(self, y, R):
-        jacobian = np.zeros((5, self.kf.dim_x))
-
         b = np.dot(self.A, np.array([[self.kf.x[0, 0]], [self.kf.x[2, 0]], [1]]))
         uv = b / b[-1, 0]  # image proj
         gamma = 1 / b[2, :]  # gamma to image
@@ -409,6 +374,7 @@ class KalmanTracker(object):
         gamma = 1 / b[2, :]
         dX_dU = gamma * self.InvA_orig[:2, :2] - (gamma**2) * b[:2,:] * self.InvA_orig[2, :2]  # dX/du
 
+        jacobian = np.zeros((5, self.kf.dim_x))
         jacobian[:2, [0, 2]] = dX_dU @ dU_dX
         jacobian[:2, -8:] = dX_dU @ dU_dA
         # jacobian[:2, [0, 2]] = dU_dX
@@ -421,15 +387,28 @@ class KalmanTracker(object):
         jacobian[-1,  StateIndex.w.value] = 1
 
         self_xy = np.r_[self_xy[:2, :], uv[:2, :], [self.kf.x[StateIndex.w.value]]]
-        diff = np.array(y) - self_xy  
-        S = np.dot(jacobian, np.dot(self.kf.P,jacobian.T)) + np.array(R)
-        SI = np.linalg.inv(S)
-        mahalanobis = diff.transpose(0, 2, 1) @ SI @ diff
+        diff = (np.array(y) - self_xy)
+        R = np.array(R)
+
+        S1 = np.dot(jacobian[:2], np.dot(self.kf.P,jacobian[:2].T)) + R[:, :2, :2]
+        SI = np.linalg.inv(S1)
+        mahalanobis_1 = diff[:, :2].transpose(0, 2, 1) @ SI @ diff[:, :2]
         try:
-            logdet = np.linalg.det(S)
-            logdet = np.log(logdet)
+            logdet1 = np.linalg.det(S1)
+            logdet1 = np.log(logdet1)
         except (RuntimeWarning, LinAlgError):
-            logdet = 6000
-        logdet[np.isnan(logdet)] = 6000
-        return mahalanobis.squeeze() #+ logdet
+            logdet1 = 6000
+        logdet1[np.isnan(logdet1)] = 6000
+
+        S2 = np.dot(jacobian[2:], np.dot(self.kf.P,jacobian[2:].T)) + R[:, 2:, 2:]
+        SI = np.linalg.inv(S2)
+        mahalanobis_2 = diff[:, 2:].transpose(0, 2, 1) @ SI @ diff[:, 2:]
+        try:
+            logdet2 = np.linalg.det(S2)
+            logdet2 = np.log(logdet2)
+        except (RuntimeWarning, LinAlgError):
+            logdet2 = 6000
+        logdet2[np.isnan(logdet2)] = 6000
+        # return mahalanobis_1.squeeze() + mahalanobis_2.squeeze()
+        return self.cbar[0] * (mahalanobis_1.squeeze() + logdet1) + self.cbar[1] * (mahalanobis_2.squeeze())
     

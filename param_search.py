@@ -63,7 +63,7 @@ def run_param_search(x,
                         dataset = "MOT17"):
     
     print(f"params: {x}")
-    wx, wy, a, process_cov_alpha, vmax = x
+    wx, wy, a, vmax = x
 
     if os.path.exists(out_path):
         shutil.rmtree(out_path)
@@ -93,7 +93,7 @@ def run_param_search(x,
     f_height=1080
 
     detector = Detector(args.add_cam_noise, args.frame_width, args.frame_height, 1/args.fps)
-    detector.load(cam_para, det_file,gmc_file,process_cov_alpha)
+    detector.load(cam_para, det_file,gmc_file,args.P)
     print(f"seq_length = {detector.seq_length}")
 
     a1 = a
@@ -190,15 +190,15 @@ if __name__ == '__main__':
     obj = [
         obj_func
     ]
-    n_var = 5
+    n_var = 4
 
     # vars
     # wx, wy, a, process_cov_alpha, vmax
     problem = FunctionalProblem(
         n_var,
         obj,
-        xl=np.array([0.001, 0.001, 7,   0, 0.001]),
-        xu=np.array([5,     5,     100, 1, 3])
+        xl=np.array([0.001, 0.001, 7,   0.001]),
+        xu=np.array([5,     5,     100, 3])
     )
     # problem = FunctionalProblem(
     #     n_var,
@@ -207,7 +207,7 @@ if __name__ == '__main__':
     #     xu=np.array([100,1])
     # )
 
-    algorithm = PatternSearch(x0=np.array([args.wx, args.wy, args.a, args.P, args.vmax]),
+    algorithm = PatternSearch(x0=np.array([args.wx, args.wy, args.a, args.vmax]),
                               init_delta=0.75)
     # algorithm = PatternSearch(x0=np.array([args.a, args.P]),
     #                           init_delta=0.5)
@@ -232,7 +232,7 @@ if __name__ == '__main__':
             self.F.set(algorithm.pop.get("F"))
 
     res = minimize(problem, algorithm, 
-                   get_termination("n_eval", 125),
+                   get_termination("n_eval", 100),
                    output=MyOutput(),
                    verbose=True, seed=1)
-    print(f"Best solution: \nwx={res.X[0]}\nwy={res.X[1]}\na={res.X[2]}\nP={res.X[3]}\nvmax={res.X[4]}\nOBJ={res.F}")
+    print(f"Best solution: \nwx={res.X[0]}\nwy={res.X[1]}\na={res.X[2]}\nvmax={res.X[3]}\nOBJ={res.F}")
