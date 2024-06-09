@@ -248,6 +248,8 @@ class KalmanTracker(object):
         self.A = np.r_[self.kf.x[-8:, 0], [1]].reshape((3, 3)).T
         self.InvA = np.linalg.inv(self.A)
 
+        # self.kf.H_Q = self.alpha * self.kf.H_Q + ((1 - self.alpha) * kalman_gain @ diff @ diff.T @ kalman_gain.T)[-8:, -8:]
+
     def compute_mixed_initial(self):
         # compute mixed initial conditions
 

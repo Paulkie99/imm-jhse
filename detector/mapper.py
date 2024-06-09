@@ -8,14 +8,14 @@ import scipy.linalg
 def getUVError(box, sigma_m=0.05):
     u, v = sigma_m * box[2], sigma_m * box[3]
 
-    # if u>13:
-    #     u = 13
-    # elif u<2:
-    #     u = 2
-    # if v>10:
-    #     v = 10
-    # elif v<2:
-    #     v = 2
+    if u>13:
+        u = 13
+    elif u<2:
+        u = 2
+    if v>10:
+        v = 10
+    elif v<2:
+        v = 2
     return u,v
     
 

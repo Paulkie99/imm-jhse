@@ -232,7 +232,7 @@ if __name__ == '__main__':
             self.F.set(algorithm.pop.get("F"))
 
     res = minimize(problem, algorithm, 
-                   get_termination("n_eval", 300),
+                   get_termination("n_eval", 150),
                    output=MyOutput(),
                    verbose=True, seed=1)
     print(f"Best solution: \nwx={res.X[0]}\nwy={res.X[1]}\na={res.X[2]}\nvmax={res.X[3]}\P={res.X[4]}\sigma_m={res.X[5]}\nOBJ={res.F}")
