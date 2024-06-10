@@ -51,6 +51,12 @@ class UCMCTrack(object):
         
         self.associate_tentative(dets)
 
+        # if frame_id > 1:
+        #     self.detector.mapper.predict(frame_affine)
+
+        #     updated_tracks = [track for track in self.trackers if track.detidx > -1]
+        #     self.detector.mapper.update(updated_tracks, dets)
+
         self.initial_tentative(dets, self.detector.mapper.A.T.flatten()[:-1], self.detector.mapper.covariance,
         self.detector.mapper.process_covariance)
         

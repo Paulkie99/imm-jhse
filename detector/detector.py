@@ -77,17 +77,19 @@ class Detector:
                 if det.det_class == -1:
                     det.det_class = 0
                 
-                # if self.add_noise:
-                #     if frame_id % 2 == 0:
-                #         noise_z = 0.5/180.0*np.pi
-                #     else:
-                #         noise_z = -0.5/180.0*np.pi
-                #     self.mapper.disturb_campara(noise_z)
+                if self.noise_degree:
+                    if frame_id % 2 == 0:
+                        noise_z = self.noise_degree/180.0*np.pi
+                    else:
+                        noise_z = -self.noise_degree/180.0*np.pi
+                    self.mapper.disturb_campara(noise_z)
 
-                # det.y,det.R = self.mapper.mapto([det.bb_left,det.bb_top,det.bb_width,det.bb_height])
+                det.y,det.R = self.mapper.get_UV_and_error(det.get_box())
+                y, R = self.mapper.uv2xy(det.y, det.R)
+                det.y, det.R = np.r_[y, det.y, [[det.bb_width]]], scipy.linalg.block_diag(R, det.R)
                 
-                # if self.add_noise:
-                #     self.mapper.reset_campara()
+                if self.noise_degree:
+                    self.mapper.reset_campara()
 
                 # 将det添加到字典中
                 if frame_id not in self.dets:
@@ -98,10 +100,10 @@ class Detector:
         dets = self.dets[frame_id]
         dets = [det for det in dets if det.det_class == det_class and det.conf >= conf_thresh]
 
-        for det in dets:
-            det.y,det.R = self.mapper.get_UV_and_error(det.get_box())
-            y, R = self.mapper.uv2xy(det.y, det.R)
-            det.y, det.R = np.r_[y, det.y, [[det.bb_width]]], scipy.linalg.block_diag(R, det.R)
+        # for det in dets:
+        #     det.y,det.R = self.mapper.get_UV_and_error(det.get_box())
+        #     y, R = self.mapper.uv2xy(det.y, det.R)
+        #     det.y, det.R = np.r_[y, det.y, [[det.bb_width]]], scipy.linalg.block_diag(R, det.R)
         return dets
 
     def cmc(self,x,y,w,h,frame_id):

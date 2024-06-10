@@ -35,8 +35,9 @@ def make_args():
     parser.add_argument('--v_ratio', type=float, default=0.05, help='assignment threshold')
     parser.add_argument('--u_max', type=float, default=13, help='assignment threshold')
     parser.add_argument('--v_max', type=float, default=10, help='assignment threshold')
-    parser.add_argument("--add_cam_noise", action="store_true", help="add noise to camera parameter.")
+    parser.add_argument("--add_cam_noise", type=float, default=0, help="add noise to camera parameter.")
     parser.add_argument("--P", type=float, default=1)
+    parser.add_argument("--sigma_m", type=float, default=0.05)
     parser.add_argument("--frame_width", type=float, default=1920)
     parser.add_argument("--frame_height", type=float, default=1080)
     args = parser.parse_args()
@@ -207,7 +208,7 @@ if __name__ == '__main__':
     #     xu=np.array([100,1])
     # )
 
-    algorithm = PatternSearch(x0=np.array([args.wx, args.wy, args.a, args.vmax, args.P, 0.05]),
+    algorithm = PatternSearch(x0=np.array([args.wx, args.wy, args.a, args.vmax, args.P, args.sigma_m]),
                               init_delta=0.75)
     # algorithm = PatternSearch(x0=np.array([args.a, args.P]),
     #                           init_delta=0.5)
@@ -235,4 +236,4 @@ if __name__ == '__main__':
                    get_termination("n_eval", 150),
                    output=MyOutput(),
                    verbose=True, seed=1)
-    print(f"Best solution: \nwx={res.X[0]}\nwy={res.X[1]}\na={res.X[2]}\nvmax={res.X[3]}\P={res.X[4]}\sigma_m={res.X[5]}\nOBJ={res.F}")
+    print(f"Best solution: \nwx={res.X[0]}\nwy={res.X[1]}\na={res.X[2]}\nvmax={res.X[3]}\nP={res.X[4]}\nsigma_m={res.X[5]}\nOBJ={res.F}")

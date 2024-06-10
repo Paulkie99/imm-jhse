@@ -39,8 +39,9 @@ def make_args():
     parser.add_argument('--v_ratio', type=float, default=0.05, help='assignment threshold')
     parser.add_argument('--u_max', type=float, default=13, help='assignment threshold')
     parser.add_argument('--v_max', type=float, default=10, help='assignment threshold')
-    parser.add_argument("--add_cam_noise", action="store_true", help="add noise to camera parameter.")
+    parser.add_argument("--add_cam_noise", type=float, default=0, help="add noise to camera parameter.")
     parser.add_argument("--P", type=float, default=1)
+    parser.add_argument("--sigma_m", type=float, default=0.05)
     parser.add_argument("--frame_width", type=float, default=1920)
     parser.add_argument("--frame_height", type=float, default=1080)
     
@@ -87,7 +88,7 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
     print(cam_para)
 
     detector = Detector(args.add_cam_noise, args.frame_width, args.frame_height, 1/args.fps)
-    detector.load(cam_para, det_file,gmc_file,args.P)
+    detector.load(cam_para, det_file,gmc_file,args.P,sigma_m=args.sigma_m)
     print(f"seq_length = {detector.seq_length}")
 
     a1 = args.a
@@ -106,17 +107,12 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
 
     tracklets = dict()
 
-    homog_dim = 100
-    homog_resize_dim = 400
-    homog_rad = 2
-    homog_thick = 1
     video_out = cv2.VideoWriter(f'{orig_save_path}/{seq_name}.mp4', cv2.VideoWriter_fourcc(*'mp4v'), fps, (int(args.frame_width), int(args.frame_height)))
     # homog_out = cv2.VideoWriter(f'{orig_save_path}/{seq_name}_homog.mp4', cv2.VideoWriter_fourcc(*'mp4v'), fps, (homog_dim, homog_dim))
 
     with open(result_file,"w") as f:
         for frame_id in range(1, detector.seq_length + 1):
             frame_img = cv2.imread(f"data/MOT17/train/{seq_name}-SDP/img1/{str(frame_id).zfill(6)}.jpg")
-            homog_img = np.zeros((homog_dim, homog_dim, 3), dtype=np.uint8)
             frame_affine = detector.gmc.get_affine(frame_id)
             dets = detector.get_dets(frame_id, conf_thresh)
             tracker.update(dets,frame_id,frame_affine)
@@ -130,7 +126,6 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
                     else:
                         tracklets[t.id].add_box(frame_id, dets[t.detidx].get_box())
                     cv2.rectangle(frame_img, (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top)), (int(dets[t.detidx].bb_left+dets[t.detidx].bb_width), int(dets[t.detidx].bb_top+dets[t.detidx].bb_height)), (0, 255, 0), 2)
-                    cv2.circle(homog_img, (int(t.kf.x[0, 0] + homog_dim / 2), int(t.kf.x[2, 0] + homog_dim / 2)), homog_rad, (0, 255, 0), homog_thick)
                     cv2.putText(frame_img, str(dets[t.detidx].track_id), (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
                 for i in tracker.confirmed_idx:
                     t = tracker.trackers[i]
@@ -142,7 +137,6 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
                         tracklets[t.id].add_box(frame_id, dets[t.detidx].get_box())
                     tracklets[t.id].activate()
                     cv2.rectangle(frame_img, (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top)), (int(dets[t.detidx].bb_left+dets[t.detidx].bb_width), int(dets[t.detidx].bb_top+dets[t.detidx].bb_height)), (0, 255, 0), 2)
-                    cv2.circle(homog_img, (int(t.kf.x[0, 0] + homog_dim / 2), int(t.kf.x[2, 0] + homog_dim / 2)), homog_rad, (0, 255, 0), homog_thick)
                     cv2.putText(frame_img, str(dets[t.detidx].track_id), (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             else:
                 for i in tracker.confirmed_idx:
@@ -152,7 +146,6 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
                     d = dets[t.detidx]
                     f.write(f"{frame_id},{t.id},{d.bb_left:.1f},{d.bb_top:.1f},{d.bb_width:.1f},{d.bb_height:.1f},{d.conf:.2f},-1,-1,-1\n")
                     cv2.rectangle(frame_img, (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top)), (int(dets[t.detidx].bb_left+dets[t.detidx].bb_width), int(dets[t.detidx].bb_top+dets[t.detidx].bb_height)), (0, 255, 0), 2)
-                    cv2.circle(homog_img, (int(t.kf.x[0, 0] + homog_dim / 2), int(t.kf.x[2, 0] + homog_dim / 2)), homog_rad, (0, 255, 0), homog_thick)
                     cv2.putText(frame_img, str(dets[t.detidx].track_id), (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             # frame_img[:homog_resize_dim, -homog_resize_dim:] = cv2.resize(homog_img, (homog_resize_dim, homog_resize_dim))
             video_out.write(frame_img)

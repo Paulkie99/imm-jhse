@@ -77,7 +77,7 @@ default_params = {
 if os.path.exists(out_path):
     shutil.rmtree(out_path)
 # Vary cam noise
-noise_degrees = np.linspace(-7, 7, 1)
+noise_degrees = np.linspace(0, 7, 1)
 results = []
 for noise_degree in noise_degrees:
     args.add_cam_noise = noise_degree
@@ -91,6 +91,7 @@ for noise_degree in noise_degrees:
         args.vmax = seq_params["vmax"]
         args.cdt = seq_params["cdt"]
         args.fps = seq_params["fps"]
+        args.sigma_m = seq_params["sigma_m"]
 
         run_ucmc(args, det_path, cam_path, gmc_path, out_path, exp_name, dataset)
 

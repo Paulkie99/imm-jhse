@@ -65,9 +65,10 @@ class KalmanTracker(object):
         self.A_orig = np.r_[H, [1]].reshape((3, 3)).T
         self.A = self.A_orig.copy()
         self.InvA_orig = np.linalg.inv(self.A_orig)
+        self.InvA = self.InvA_orig.copy()
 
         det_feet, det_R = self.get_UV_and_error(det.get_box())
-        x_local, r_local, _ = self.uv2xy(det_feet, det_R)
+        x_local, r_local, _ = self.uv2xy(det_feet, det_R, H_P)
 
         self.kf.x[0] = x_local[0] #xl
         self.kf.x[1] = 0 #vxl
@@ -173,16 +174,24 @@ class KalmanTracker(object):
 
         return uv_proj, jac @ sigma_xy @ jac.T, jac
 
-    def uv2xy(self, uv, sigma_uv):
+    def uv2xy(self, uv, sigma_uv, H_P):
         uv1 = np.zeros((3, 1))
         uv1[:2,:] = uv
         uv1[2,:] = 1
-        b = np.dot(self.InvA_orig, uv1)
+        b = np.dot(self.InvA, uv1)
         gamma = 1 / b[2,:]
-        dX_dU = gamma * self.InvA_orig[:2, :2] - (gamma**2) * b[:2,:] * self.InvA_orig[2, :2]  # dX/du
+        dX_dU = gamma * self.InvA[:2, :2] - (gamma**2) * b[:2,:] * self.InvA[2, :2]  # dX/du
         xy = b[:2,:] * gamma
 
-        R = np.dot(np.dot(dX_dU, sigma_uv[:2, :2]), dX_dU.T)
+        gamma2 = 1 / (np.dot(self.A[-1, :2], xy[:, 0]) + 1)
+        dU_dA = gamma2 * np.array([
+            [xy[0, 0], 0, -xy[0, 0] * uv[0, 0], xy[1, 0], 0, -uv[0, 0] * xy[1, 0], 1, 0],
+            [0, xy[0, 0], -xy[0, 0] * uv[1, 0], 0, xy[1, 0], -uv[1, 0] * xy[1, 0], 0, 1]
+                                  ])  # du/dA
+        dX_dA = dX_dU @ dU_dA
+
+        R = np.dot(np.dot(dX_dU, sigma_uv[:2, :2]), dX_dU.T) + np.dot(np.dot(dX_dA, H_P), dX_dA.T)
+
         return xy, R, dX_dU
 
     def update(self, y, R):
@@ -247,8 +256,6 @@ class KalmanTracker(object):
 
         self.A = np.r_[self.kf.x[-8:, 0], [1]].reshape((3, 3)).T
         self.InvA = np.linalg.inv(self.A)
-
-        # self.kf.H_Q = self.alpha * self.kf.H_Q + ((1 - self.alpha) * kalman_gain @ diff @ diff.T @ kalman_gain.T)[-8:, -8:]
 
     def compute_mixed_initial(self):
         # compute mixed initial conditions
@@ -411,6 +418,6 @@ class KalmanTracker(object):
         except (RuntimeWarning, LinAlgError):
             logdet2 = 6000
         logdet2[np.isnan(logdet2)] = 6000
-        # return mahalanobis_1.squeeze() + mahalanobis_2.squeeze()
+        # return mahalanobis_1.squeeze() + logdet1
         return self.cbar[0] * (mahalanobis_1.squeeze() + logdet1) + self.cbar[1] * (mahalanobis_2.squeeze())
     

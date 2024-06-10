@@ -117,6 +117,85 @@ class Mapper(object):
 
         self.sigma_m = sigma_m
 
+    def predict(self, affine):
+        affine = np.r_[affine, [[0, 0, 1]]]
+        self.A = affine @ self.A
+        assert self.A[-1, -1] == 1
+        self.InvA = np.linalg.inv(self.A)
+        trans_mat = scipy.linalg.block_diag(
+            np.kron(np.eye(2), affine),
+            affine[:2, :2],
+        )
+        self.covariance = trans_mat @ self.covariance @ trans_mat.T + self.process_covariance
+
+    def update(self, tracks, dets):
+        if not len(tracks):
+            return
+
+        feet_measurements = []
+        measurement_covs = []
+        track_means = []
+        meas_size = 2
+        state_size = 4
+        jacobian = np.zeros((len(tracks) * meas_size, len(tracks) * state_size + 8))
+        temp_cov = np.zeros((len(tracks) * state_size + 8, len(tracks) * state_size + 8))
+        uv_projs = []
+        for t_idx, track in enumerate(tracks):
+            det_idx = track.detidx
+            track_means.append(track.kf.x[:4])
+
+            xy1 = np.zeros((3, 1))
+            xy = track.kf.x
+            xy1[:2, :] = xy[[0, 2]]
+            xy1[2, :] = 1
+            b = np.dot(self.A, xy1)
+            gamma = 1 / b[2,:]
+
+            uv_proj = b[:2,:] * gamma
+            uv_projs.append(uv_proj)
+
+            dU_dX = np.zeros((2, 4))
+            dU_dX[:, [0, 2]] = gamma * self.A[:2, :2] - (gamma**2) * b[:2,:] * self.A[2, :2]
+            jacobian[t_idx * meas_size: (t_idx + 1) * meas_size,
+                    t_idx * state_size: (t_idx + 1) * state_size] = dU_dX
+            
+            dU_dA = gamma * np.array([
+                [xy1[0, 0], 0, -xy1[0, 0] * uv_proj[0, 0], xy1[1, 0], 0, -uv_proj[0, 0] * xy1[1, 0], 1, 0],
+                [0, xy1[0, 0], -xy1[0, 0] * uv_proj[1, 0], 0, xy1[1, 0], -uv_proj[1, 0] * xy1[1, 0], 0, 1]
+                                    ])
+            
+            jacobian[t_idx * meas_size: (t_idx + 1) * meas_size, -8:] = dU_dA
+
+            temp_cov[t_idx * state_size: (t_idx + 1) * state_size, 
+                     t_idx * state_size: (t_idx + 1) * state_size] = track.kf.P[:state_size, :state_size]
+            temp_cov[t_idx * state_size: (t_idx + 1) * state_size, -8:] = track.kf.P[:state_size, -8:]
+            temp_cov[-8:, t_idx * state_size: (t_idx + 1) * state_size] = track.kf.P[-8:, :state_size]
+
+            feet, cov = dets[det_idx].y[2:4], dets[det_idx].R[2:4, 2:4]
+            feet_measurements.append(feet)
+            measurement_covs.append(cov)
+
+        temp_cov[-8:, -8:] = self.covariance
+        feet_measurements = np.array(feet_measurements)
+        measurement_covs = scipy.linalg.block_diag(*measurement_covs)
+        
+        projected_cov = jacobian @ temp_cov @ jacobian.T + measurement_covs #@ np.diag([100, 100])
+
+        uv_projs = np.array(uv_projs)
+        innov = feet_measurements - uv_projs
+        inv_projected_cov = np.linalg.inv(projected_cov)
+
+        kalman_gain = temp_cov @ jacobian.T @ inv_projected_cov
+        innov = innov.reshape((kalman_gain.shape[1], 1))
+
+        old_means = np.r_[np.array(track_means).reshape((state_size * len(tracks))), self.A.T.flatten()[:-1]] 
+        new_mean = old_means + (kalman_gain @ innov.squeeze())
+        self.A = np.r_[new_mean[-8:], [1]].reshape((3, 3)).T
+        self.InvA = np.linalg.inv(self.A)
+
+        temp_cov = ((np.eye(temp_cov.shape[0]) - kalman_gain @ jacobian) @ temp_cov)
+        self.covariance = temp_cov[-8:, -8:]
+
     def uv2xy(self, uv, sigma_uv):
         if self.is_ok == False:
             return None, None
@@ -129,7 +208,14 @@ class Mapper(object):
         dX_dU = gamma * self.InvA[:2, :2] - (gamma**2) * b[:2,:] * self.InvA[2, :2]  # dX/du
         xy = b[:2,:] * gamma
 
-        sigma_xy = np.dot(np.dot(dX_dU, sigma_uv[:2, :2]), dX_dU.T)
+        gamma2 = 1 / (np.dot(self.A[-1, :2], xy[:, 0]) + 1)
+        dU_dA = gamma2 * np.array([
+            [xy[0, 0], 0, -xy[0, 0] * uv[0, 0], xy[1, 0], 0, -uv[0, 0] * xy[1, 0], 1, 0],
+            [0, xy[0, 0], -xy[0, 0] * uv[1, 0], 0, xy[1, 0], -uv[1, 0] * xy[1, 0], 0, 1]
+                                  ])  # du/dA
+        dX_dA = dX_dU @ dU_dA
+
+        sigma_xy = np.dot(np.dot(dX_dU, sigma_uv[:2, :2]), dX_dU.T) + np.dot(np.dot(dX_dA, self.covariance), dX_dA.T)
         return xy, sigma_xy
     
     def xy2uv(self,x,y):
@@ -156,7 +242,7 @@ class Mapper(object):
         sigma_uv[2,2] = sigma_uv[0,0]
         return uv, sigma_uv
     
-    def disturb_campara(self,z, z0):
+    def disturb_campara(self,z):
 
         # 根据z轴旋转，构造旋转矩阵Rz
         Rz = np.array([[np.cos(z), -np.sin(z), 0], [np.sin(z), np.cos(z), 0], [0, 0, 1]])
@@ -167,7 +253,7 @@ class Mapper(object):
         Ko_new[:3, :3] = R
         self.KiKo = np.dot(self.Ki, Ko_new)
         self.A[:, :2] = self.KiKo[:, :2]
-        self.A[:, 2] = z0 * self.KiKo[:, 2] + self.KiKo[:, 3]
+        self.A[:, 2] = self.z0 * self.KiKo[:, 2] + self.KiKo[:, 3]
         self.InvA = np.linalg.inv(self.A)
 
     def reset_campara(self):
