@@ -14,7 +14,7 @@
             "justMyCode": true,
             "python": "/home/sparta-guestuser/miniconda3/envs/mamba/bin/python",
             // "args": ["--seq", "MOT17-02", "--fps", "30", "--wx", "0.1", "--wy", "0.2", "--a", "10", "--cdt", "30", "--hp", "--cmc", "--P", "0"]
-            "args": ["--seq", "MOT17-05", "--fps", "14", "--wx", "0.1", "--wy", "3.0", "--a", "10", "--cdt", "10", "--hp", "--cmc", "--P", "0.5", "--frame_width", "640", "--frame_height", "480"]
+            "args": ["--seq", "MOT17-05", "--fps", "14", "--wx", "0.1", "--wy", "3.0", "--a", "10", "--cdt", "10", "--hp", "--cmc", "--P", "1", "--frame_width", "640", "--frame_height", "480"]
         },
         {
             "name": "Debug Demo",

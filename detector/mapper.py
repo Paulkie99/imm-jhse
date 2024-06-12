@@ -103,11 +103,14 @@ class Mapper(object):
             self.z0 = 0
 
         self.reset_campara()
-        if noise_degree > 0:
-            self.disturb_campara(noise_degree)
+        # if noise_degree > 0:
+        #     self.disturb_campara(noise_degree)
 
         self.A /= self.A[-1, -1]
         self.InvA = np.linalg.inv(self.A)
+
+        self.A_orig = self.A.copy()
+        self.InvA_orig = self.InvA.copy()
 
         self.process_alpha = process_alpha
 
@@ -242,12 +245,16 @@ class Mapper(object):
         sigma_uv[2,2] = sigma_uv[0,0]
         return uv, sigma_uv
     
-    def disturb_campara(self,z):
+    def disturb_campara(self,z,axis='z'):
 
         # 根据z轴旋转，构造旋转矩阵Rz
-        Rz = np.array([[np.cos(z), -np.sin(z), 0], [np.sin(z), np.cos(z), 0], [0, 0, 1]])
+        Rx = np.array([[1,0,0],[0,np.cos(z),-np.sin(z)],[0,np.sin(z),np.cos(z)]])
+        Ry = np.array([[np.cos(z),0,np.sin(z)],[0,1,0],[-np.sin(z),0,np.cos(z)]])
+        Rz = np.array([[np.cos(z),-np.sin(z),0],[np.sin(z),np.cos(z),0],[0,0,1]])
 
-        R = np.dot(self.Ko[:3, :3],Rz)
+        R = Rz if axis == 'z' else Ry if axis == 'y' else Rx
+
+        R = np.dot(self.Ko[:3, :3],R)
         # 将self.Ko 拷贝到新变量 Ko_new
         Ko_new = self.Ko.copy()
         Ko_new[:3, :3] = R

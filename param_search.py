@@ -1,3 +1,4 @@
+import json
 import argparse
 from functools import partial
 import os
@@ -64,7 +65,7 @@ def run_param_search(x,
                         dataset = "MOT17"):
     
     print(f"params: {x}")
-    wx, wy, a, vmax, P, sigma_m = x
+    wx, wy, a, vmax, P = x
 
     if os.path.exists(out_path):
         shutil.rmtree(out_path)
@@ -90,11 +91,8 @@ def run_param_search(x,
     print(det_file)
     print(cam_para)
 
-    f_width=1920
-    f_height=1080
-
     detector = Detector(args.add_cam_noise, args.frame_width, args.frame_height, 1/args.fps)
-    detector.load(cam_para, det_file,gmc_file,P,sigma_m)
+    detector.load(cam_para, det_file,gmc_file,P)
     print(f"seq_length = {detector.seq_length}")
 
     a1 = a
@@ -166,9 +164,7 @@ def run_param_search(x,
 
     return eval_AssA(wx, wy, a, vmax)
 
-
-if __name__ == '__main__':
-
+def run_pattern_search(seq, seq_params):
     det_path = "det_results/mot17/yolox_x_ablation"
     cam_path = "cam_para/MOT17"
     gmc_path = "gmc/mot17"
@@ -176,6 +172,18 @@ if __name__ == '__main__':
     exp_name = "val"
     dataset = "MOT17"
     args = make_args()
+
+    print(seq_params)
+
+    args.seq = seq
+    args.hp = True
+    args.wx = seq_params["wx"]
+    args.wy = seq_params["wy"]
+    args.a = seq_params["a"]
+    args.vmax = seq_params["vmax"]
+    args.fps = seq_params["fps"]
+    args.cdt = seq_params["cdt"]
+    args.P = seq_params["P"]
 
     obj_func = partial(
         run_param_search,
@@ -191,15 +199,15 @@ if __name__ == '__main__':
     obj = [
         obj_func
     ]
-    n_var = 6
+    n_var = 5
 
     # vars
     # wx, wy, a, vmax, P, sigma_m
     problem = FunctionalProblem(
         n_var,
         obj,
-        xl=np.array([0.001, 0.001, 7,   0.001, -9, 0.01]),
-        xu=np.array([5,     5,     100, 3,      3,   0.3])
+        xl=np.array([0.001, 0.001, 7,   0.001, -16]),
+        xu=np.array([5,     5,     100, 3,      3])
     )
     # problem = FunctionalProblem(
     #     n_var,
@@ -208,7 +216,7 @@ if __name__ == '__main__':
     #     xu=np.array([100,1])
     # )
 
-    algorithm = PatternSearch(x0=np.array([args.wx, args.wy, args.a, args.vmax, args.P, args.sigma_m]),
+    algorithm = PatternSearch(x0=np.array([args.wx, args.wy, args.a, args.vmax, args.P]),
                               init_delta=0.75)
     # algorithm = PatternSearch(x0=np.array([args.a, args.P]),
     #                           init_delta=0.5)
@@ -233,7 +241,94 @@ if __name__ == '__main__':
             self.F.set(algorithm.pop.get("F"))
 
     res = minimize(problem, algorithm, 
-                   get_termination("n_eval", 150),
+                   get_termination("n_eval", 125),
                    output=MyOutput(),
                    verbose=True, seed=1)
-    print(f"Best solution: \nwx={res.X[0]}\nwy={res.X[1]}\na={res.X[2]}\nvmax={res.X[3]}\nP={res.X[4]}\nsigma_m={res.X[5]}\nOBJ={res.F}")
+    # print(f"Best solution: \nwx={res.X[0]}\nwy={res.X[1]}\na={res.X[2]}\nvmax={res.X[3]}\P={res.X[4]}\nOBJ={res.F}")
+    return {
+        "wx": res.X[0],
+        "wy": res.X[1], 
+        "a": res.X[2],
+        "vmax": res.X[3],
+        "P": res.X[4],
+        "OBJ": res.F[0]
+    }
+
+if __name__ == '__main__':
+    sequences = ["MOT17-02", "MOT17-04", "MOT17-05", "MOT17-09", "MOT17-10", "MOT17-11", "MOT17-13"]
+
+    default_params = {
+    "MOT17-02": {
+        "wx": 1e-1,
+        "wy": 0.2,
+        "a": 10,
+        "P": -9,
+        "vmax": 0.5,
+        "cdt": 30,
+        "fps": 30
+    },
+    "MOT17-04": {
+        "wx": 0.5,
+        "wy": 0.5,
+        "a": 10.0,
+        "P": -9,
+        "vmax": 0.5,
+        "cdt": 30,
+        "fps": 30
+    },
+    "MOT17-05": {
+        "wx": 0.1,
+        "wy": 3,
+        "a": 10,
+        "P": 0,
+        "vmax": 0.5,
+        "cdt": 10,
+        "fps": 14
+    },
+    "MOT17-09": {
+        "wx": 0.5,
+        "wy": 1,
+        "a": 10,
+        "P": -9,
+        "vmax": 0.5,
+        "cdt": 30,
+        "fps": 30
+    },
+    "MOT17-10": {
+        "wx": 5,
+        "wy": 5,
+        "a": 60,
+        "P": -8,
+        "vmax": 0.5,
+        "cdt": 10,
+        "fps": 30
+    },
+    "MOT17-11": {
+        "wx": 5,
+        "wy": 5,
+        "a": 40,
+        "P": -8,
+        "vmax": 0.5,
+        "cdt": 10,
+        "fps": 30
+    },
+    "MOT17-13": {
+        "wx": 5,
+        "wy": 5,
+        "a": 40,
+        "P": -5,
+        "vmax": 0.5,
+        "cdt": 10,
+        "fps": 25
+    }
+    }
+    results = {}
+    for seq in sequences:
+        results[seq] = run_pattern_search(seq, default_params[seq])
+
+    print(results)
+    out_file = open("param_search_results.json", "w") 
+  
+    json.dump(results, out_file, indent = 6) 
+    
+    out_file.close() 

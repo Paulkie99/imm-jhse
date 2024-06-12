@@ -36,10 +36,11 @@ class Detection:
 
 # Detector类，用于从文本文件读取任意一帧中的目标检测的结果
 class Detector:
-    def __init__(self, noise_degree=0, frame_width=1920, frame_height=1080, dt=1/30):
+    def __init__(self, noise_degree=0, frame_width=1920, frame_height=1080, dt=1/30, axis='z'):
         self.seq_length = 0
         self.gmc = None
         self.noise_degree = noise_degree
+        self.axis = axis
         self.frame_width = frame_width
         self.frame_height = frame_height
         self.dt = dt
@@ -82,7 +83,7 @@ class Detector:
                         noise_z = self.noise_degree/180.0*np.pi
                     else:
                         noise_z = -self.noise_degree/180.0*np.pi
-                    self.mapper.disturb_campara(noise_z)
+                    self.mapper.disturb_campara(noise_z, self.axis)
 
                 det.y,det.R = self.mapper.get_UV_and_error(det.get_box())
                 y, R = self.mapper.uv2xy(det.y, det.R)

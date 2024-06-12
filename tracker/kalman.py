@@ -57,15 +57,14 @@ class KalmanTracker(object):
     #      [0, 0, 1, 0, 0, 0, -0.5,0]]
     # ).T
 
-    def __init__(self, det, wx, wy, vmax,dt=1/30,H=None,H_P=None,H_Q=None,alpha_cov=1):
+    def __init__(self, det, wx, wy, vmax,dt=1/30,H=None,H_P=None,H_Q=None,alpha_cov=1,InvA_orig=None):
         # xl, vxl, yl, vyl, xc, vxc, yc, vyc, w, vw, h, vh, h1, h4, h7, h2, h5, h8, h3, h6
         self.kf = KalmanFilter(dim_x=20, dim_z=5)
         self.motion_transition_mat = np.array([[1, dt, 0, 0], [0, 1, 0, 0], [0, 0, 1, dt], [0, 0, 0, 1]])
 
-        self.A_orig = np.r_[H, [1]].reshape((3, 3)).T
-        self.A = self.A_orig.copy()
-        self.InvA_orig = np.linalg.inv(self.A_orig)
-        self.InvA = self.InvA_orig.copy()
+        self.A = np.r_[H, [1]].reshape((3, 3)).T
+        self.InvA = np.linalg.inv(self.A)
+        self.InvA_orig = InvA_orig
 
         det_feet, det_R = self.get_UV_and_error(det.get_box())
         x_local, r_local, _ = self.uv2xy(det_feet, det_R, H_P)
@@ -101,6 +100,8 @@ class KalmanTracker(object):
         self.kf.P = np.zeros((4, 4))
         np.fill_diagonal(self.kf.P, np.array([1, (vmax / 3)**2, 1,  (vmax / 3)**2]))
         # np.fill_diagonal(self.kf.P, np.array([1, vmax**2/3.0, 1,  vmax**2/3.0]))
+        # self.kf.P[[0, 2], 0] = ((2 * (dt / 0.04)) ** 2 * r_local)[:, 0]
+        # self.kf.P[[0, 2], 2] = ((2 * (dt / 0.04)) ** 2 * r_local)[:, 1]
         self.kf.P[[0, 2], 0] = (1 * r_local)[:, 0]
         self.kf.P[[0, 2], 2] = (1 * r_local)[:, 1]
 
@@ -219,13 +220,19 @@ class KalmanTracker(object):
              [0, 1, 0, 0.5]]
         )
 
+        # jacobian[:2, [0, 2]] = np.eye(2)
+        # jacobian[:2, -8:] = dU_dA
         jacobian[:2, [0, 2]] = dU_dX
         jacobian[:2, -8:] = dU_dA
         jacobian[2:4, [StateIndex.xc.value, StateIndex.yc.value, StateIndex.w.value, StateIndex.h.value]] = dU_dU
         jacobian[-1, StateIndex.w.value] = 1
 
+        # y_G, R_G, _ = self.uv2xy(y[2:4], R[2:4, 2:4], self.kf.P[-8:, -8:])
+
+        # diff = np.r_[y_G, y[2:]] - np.r_[xy, uv_proj, self.kf.x[[StateIndex.w.value], :]]
         diff = np.r_[y[2:4], y[2:]] - np.r_[uv_proj, uv_proj, self.kf.x[[StateIndex.w.value], :]]
 
+        # S_0 = np.dot(jacobian[:2], np.dot(self.kf.P,jacobian[:2].T)) + R_G
         S_0 = np.dot(jacobian[:2], np.dot(self.kf.P,jacobian[:2].T)) + R[2:4, 2:4]
         SI_0 = np.linalg.inv(S_0)
 
@@ -396,8 +403,13 @@ class KalmanTracker(object):
         jacobian[-1,  StateIndex.w.value] = 1
 
         self_xy = np.r_[self_xy[:2, :], uv[:2, :], [self.kf.x[StateIndex.w.value]]]
+        # self_xy = np.r_[uv[:2, :], uv[:2, :], [self.kf.x[StateIndex.w.value]]]
+
         diff = (np.array(y) - self_xy)
         R = np.array(R)
+        # diff = (np.array(y)[:, [2, 3, 2, 3, 4]] - self_xy)
+        # R = np.array(R)
+        # R[:, :2, :2] = R[:, 2:4, 2:4]
 
         S1 = np.dot(jacobian[:2], np.dot(self.kf.P,jacobian[:2].T)) + R[:, :2, :2]
         SI = np.linalg.inv(S1)
@@ -419,5 +431,6 @@ class KalmanTracker(object):
             logdet2 = 6000
         logdet2[np.isnan(logdet2)] = 6000
         # return mahalanobis_1.squeeze() + logdet1
+        # return self.cbar[0] * mahalanobis_1.squeeze() + self.cbar[1] * mahalanobis_2.squeeze()
         return self.cbar[0] * (mahalanobis_1.squeeze() + logdet1) + self.cbar[1] * (mahalanobis_2.squeeze())
     
