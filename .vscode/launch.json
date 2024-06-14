@@ -26,6 +26,17 @@
             "justMyCode": true,
             "python": "/home/sparta-guestuser/miniconda3/envs/mamba/bin/python",
             "args": ["--cam_para", "demo/cam_para.txt", "--video", "demo/demo.mp4"]
+        },
+        {
+            "name": "Debug Dance",
+            "type": "python",
+            "request": "launch",
+            "program": "run_dance_val.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "justMyCode": true,
+            "python": "/home/sparta-guestuser/miniconda3/envs/mamba/bin/python",
+            "args": ["--seq", "dancetrack0004", "--wx", "1", "--wy", "1", "--a", "10", "--cdt", "30", "--P", "-32"]
         }
     ]
 }

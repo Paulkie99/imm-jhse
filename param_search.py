@@ -206,7 +206,7 @@ def run_pattern_search(seq, seq_params):
     problem = FunctionalProblem(
         n_var,
         obj,
-        xl=np.array([0.001, 0.001, 7,   0.001, -16]),
+        xl=np.array([0.001, 0.001, 1,   0.001, -32]),
         xu=np.array([5,     5,     100, 3,      3])
     )
     # problem = FunctionalProblem(
@@ -241,7 +241,7 @@ def run_pattern_search(seq, seq_params):
             self.F.set(algorithm.pop.get("F"))
 
     res = minimize(problem, algorithm, 
-                   get_termination("n_eval", 125),
+                   get_termination("n_eval", 25 * n_var),
                    output=MyOutput(),
                    verbose=True, seed=1)
     # print(f"Best solution: \nwx={res.X[0]}\nwy={res.X[1]}\na={res.X[2]}\nvmax={res.X[3]}\P={res.X[4]}\nOBJ={res.F}")
@@ -259,64 +259,64 @@ if __name__ == '__main__':
 
     default_params = {
     "MOT17-02": {
-        "wx": 1e-1,
-        "wy": 0.2,
+        "wx": 1,
+        "wy": 1,
         "a": 10,
-        "P": -9,
+        "P": -32,
         "vmax": 0.5,
         "cdt": 30,
         "fps": 30
     },
     "MOT17-04": {
-        "wx": 0.5,
-        "wy": 0.5,
+        "wx": 1,
+        "wy": 1,
         "a": 10.0,
-        "P": -9,
+        "P": -32,
         "vmax": 0.5,
         "cdt": 30,
         "fps": 30
     },
     "MOT17-05": {
-        "wx": 0.1,
-        "wy": 3,
+        "wx": 1,
+        "wy": 1,
         "a": 10,
-        "P": 0,
+        "P": -32,
         "vmax": 0.5,
         "cdt": 10,
         "fps": 14
     },
     "MOT17-09": {
-        "wx": 0.5,
+        "wx": 1,
         "wy": 1,
         "a": 10,
-        "P": -9,
+        "P": -32,
         "vmax": 0.5,
         "cdt": 30,
         "fps": 30
     },
     "MOT17-10": {
-        "wx": 5,
-        "wy": 5,
-        "a": 60,
-        "P": -8,
+        "wx": 1,
+        "wy": 1,
+        "a": 10,
+        "P": -32,
         "vmax": 0.5,
         "cdt": 10,
         "fps": 30
     },
     "MOT17-11": {
-        "wx": 5,
-        "wy": 5,
-        "a": 40,
-        "P": -8,
+        "wx": 1,
+        "wy": 1,
+        "a": 10,
+        "P": -32,
         "vmax": 0.5,
         "cdt": 10,
         "fps": 30
     },
     "MOT17-13": {
-        "wx": 5,
-        "wy": 5,
-        "a": 40,
-        "P": -5,
+        "wx": 1,
+        "wy": 1,
+        "a": 10,
+        "P": -32,
         "vmax": 0.5,
         "cdt": 10,
         "fps": 25

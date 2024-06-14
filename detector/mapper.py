@@ -114,7 +114,7 @@ class Mapper(object):
 
         self.process_alpha = process_alpha
 
-        self.covariance = np.eye(8) * 0
+        self.covariance = np.eye(8) * 1e-12
 
         self.process_covariance = np.eye(8) * 1e-3 * ((dt / (1/14))**2) * 10 ** process_alpha
 
