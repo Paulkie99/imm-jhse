@@ -87,7 +87,11 @@ class Detector:
 
                 det.y,det.R = self.mapper.get_UV_and_error(det.get_box())
                 y, R = self.mapper.uv2xy(det.y, det.R)
-                det.y, det.R = np.r_[y, det.y, [[det.bb_width]]], scipy.linalg.block_diag(R, det.R)
+                det.y, det.R = np.r_[y, det.y, [[det.bb_left],
+                                                [det.bb_top],
+                                                [det.bb_left + det.bb_width], 
+                                                [det.bb_top + det.bb_height]]
+                                                ], scipy.linalg.block_diag(R, det.R)
                 
                 if self.noise_degree:
                     self.mapper.reset_campara()

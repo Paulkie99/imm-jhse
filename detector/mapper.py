@@ -114,9 +114,9 @@ class Mapper(object):
 
         self.process_alpha = process_alpha
 
-        self.covariance = np.eye(8) * 1e-12
+        self.covariance = np.eye(8) * 1e-32
 
-        self.process_covariance = np.eye(8) * 1e-3 * ((dt / (1/14))**2) * 10 ** process_alpha
+        self.process_covariance = np.eye(8) * 1e-3 * ((dt / (1/14))**2) * 10.0 ** process_alpha
 
         self.sigma_m = sigma_m
 
@@ -239,10 +239,9 @@ class Mapper(object):
     def get_UV_and_error(self, box):
         uv = np.array([[box[0]+box[2]/2], [box[1]+box[3]]])
         u_err,v_err = getUVError(box, self.sigma_m)
-        sigma_uv = np.identity(3)
+        sigma_uv = np.identity(2)
         sigma_uv[0,0] = u_err*u_err
         sigma_uv[1,1] = v_err*v_err
-        sigma_uv[2,2] = sigma_uv[0,0]
         return uv, sigma_uv
     
     def disturb_campara(self,z,axis='z'):

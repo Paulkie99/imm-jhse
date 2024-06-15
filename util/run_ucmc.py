@@ -6,6 +6,7 @@ import os,time
 import cv2
 import argparse
 import configparser
+import shutil
 
 class Tracklet():
     def __init__(self,frame_id,box):
@@ -119,7 +120,7 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
         for frame_id in range(1, detector.seq_length + 1):
             frame_img = cv2.imread(f"data/{dataset}/{'train' if exp_name == 'val' and dataset == 'MOT17' else exp_name}/{seq_name}{'-SDP' if 'MOT' in dataset else ''}/img1/{str(frame_id).zfill(6 if 'MOT' in dataset else 8)}.jpg")
             frame_affine = detector.gmc.get_affine(frame_id)
-            dets = detector.get_dets(frame_id, conf_thresh)
+            dets = detector.get_dets(frame_id, conf_thresh, 1 if "oracle" in det_path else 0)
             tracker.update(dets,frame_id,frame_affine)
             if args.hp:
                 for i in tracker.tentative_idx:
@@ -131,7 +132,9 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
                     else:
                         tracklets[t.id].add_box(frame_id, dets[t.detidx].get_box())
                     cv2.rectangle(frame_img, (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top)), (int(dets[t.detidx].bb_left+dets[t.detidx].bb_width), int(dets[t.detidx].bb_top+dets[t.detidx].bb_height)), (0, 255, 0), 2)
-                    cv2.putText(frame_img, str(np.round(t.mu, 1)), (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top) + 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                    cv2.putText(frame_img, str(np.round(t.mu, 1)), (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top) + 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                    cv2.putText(frame_img, str(np.round(t.relative_iou, 1)), (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top) + 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                    cv2.putText(frame_img, str(np.round(t.g_mahala, 1)), (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top) + 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
                     cv2.putText(frame_img, str(dets[t.detidx].track_id), (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
                 for i in tracker.confirmed_idx:
                     t = tracker.trackers[i]
@@ -143,7 +146,9 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
                         tracklets[t.id].add_box(frame_id, dets[t.detidx].get_box())
                     tracklets[t.id].activate()
                     cv2.rectangle(frame_img, (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top)), (int(dets[t.detidx].bb_left+dets[t.detidx].bb_width), int(dets[t.detidx].bb_top+dets[t.detidx].bb_height)), (0, 255, 0), 2)
-                    cv2.putText(frame_img, str(np.round(t.mu, 1)), (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top) + 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                    cv2.putText(frame_img, str(np.round(t.mu, 1)), (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top) + 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                    cv2.putText(frame_img, str(np.round(t.relative_iou, 1)), (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top) + 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                    cv2.putText(frame_img, str(np.round(t.g_mahala, 1)), (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top) + 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
                     cv2.putText(frame_img, str(dets[t.detidx].track_id), (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             else:
                 for i in tracker.confirmed_idx:
@@ -153,7 +158,9 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
                     d = dets[t.detidx]
                     f.write(f"{frame_id},{t.id},{d.bb_left:.1f},{d.bb_top:.1f},{d.bb_width:.1f},{d.bb_height:.1f},{d.conf:.2f},-1,-1,-1\n")
                     cv2.rectangle(frame_img, (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top)), (int(dets[t.detidx].bb_left+dets[t.detidx].bb_width), int(dets[t.detidx].bb_top+dets[t.detidx].bb_height)), (0, 255, 0), 2)
-                    cv2.putText(frame_img, str(np.round(t.mu, 1)), (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top) + 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                    cv2.putText(frame_img, str(np.round(t.mu, 1)), (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top) + 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                    cv2.putText(frame_img, str(np.round(t.relative_iou, 1)), (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top) + 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                    cv2.putText(frame_img, str(np.round(t.g_mahala, 1)), (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top) + 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
                     cv2.putText(frame_img, str(dets[t.detidx].track_id), (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             # frame_img[:homog_resize_dim, -homog_resize_dim:] = cv2.resize(homog_img, (homog_resize_dim, homog_resize_dim))
             video_out.write(frame_img)

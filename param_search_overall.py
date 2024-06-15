@@ -125,7 +125,7 @@ def run_param_search(x, sequences,
         with open(result_file,"w") as f:
             for frame_id in range(1, detector.seq_length + 1):
                 frame_affine = detector.gmc.get_affine(frame_id)
-                dets = detector.get_dets(frame_id, conf_thresh)
+                dets = detector.get_dets(frame_id, conf_thresh, 1 if "oracle" in det_path else 0)
                 frametime = time.time()
                 try:
                     tracker.update(dets,frame_id,frame_affine)
@@ -213,8 +213,8 @@ def run_pattern_search(sequences, seq_params, det_path, cam_path, gmc_path, out_
     problem = FunctionalProblem(
         n_var,
         obj,
-        xl=np.array([0.001, 0.001, 1,   0.001, -32]),
-        xu=np.array([5,     5,     100, 3,      3])
+        xl=np.array([0.001,  0.001,0.5,   0.001, -32]),
+        xu=np.array([30,     30,   1,     3,      3])
     )
 
     algorithm = PatternSearch(x0=np.array([args.wx, args.wy, args.a, args.vmax, args.P]),
@@ -247,7 +247,7 @@ def run_pattern_search(sequences, seq_params, det_path, cam_path, gmc_path, out_
     }
 
 if __name__ == '__main__':
-    det_path = "det_results/dance/val"#"det_results/mot17/yolox_x_ablation"
+    det_path = "det_results/dance/val_oracle"#"det_results/mot17/yolox_x_ablation"
     cam_path = "cam_para/DanceTrack"#"cam_para/MOT17"
     gmc_path = "gmc/dance"#"gmc/mot17"
     out_path = "output/dance"#"output/mot17"
@@ -259,11 +259,11 @@ if __name__ == '__main__':
     sequences = [seq.split('.')[0] for seq in sequences]
 
     default_params = {
-        "wx": 1,
-        "wy": 1,
-        "a": 10,
-        "P": -32,
-        "vmax": 0.5,
+        "wx": 20,
+        "wy": 20,
+        "a": 0.99,
+        "P": -3,
+        "vmax": 1,
         "cdt": 30,
         "fps": 30
     }
