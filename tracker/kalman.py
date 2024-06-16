@@ -16,24 +16,18 @@ class TrackStatus(Enum):
 class StateIndex(Enum):
     xl = 0
     vxl = 1
-    yl = 2
-    vyl = 3
-    xc = 4
-    vxc = 5
-    yc = 6
-    vyc = 7
-    w = 8
-    vw = 9
-    h = 10
-    vh = 11
-    h1 = 12
-    h4 = 13
-    h7 = 14
-    h2 = 15
-    h5 = 16
-    h8 = 17
-    h3 = 18
-    h6 = 19
+    axl = 2
+    yl = 3
+    vyl = 4
+    ayl = 5
+    h1 = 6
+    h4 = 7
+    h7 = 8
+    h2 = 9
+    h5 = 10
+    h8 = 11
+    h3 = 12
+    h6 = 13
 
 def iou_batch(bb_test, bb_gt):
     """
@@ -56,30 +50,16 @@ def iou_batch(bb_test, bb_gt):
 class KalmanTracker(object):
 
     count = 1
-    img_filter_indices = [StateIndex.xc.value, StateIndex.vxc.value, StateIndex.yc.value, StateIndex.vyc.value, StateIndex.w.value, StateIndex.vw.value, StateIndex.h.value, StateIndex.vh.value]
-    ground_filter_indices = [StateIndex.xl.value, StateIndex.vxl.value, StateIndex.yl.value, StateIndex.vyl.value, StateIndex.h1.value, StateIndex.h4.value, StateIndex.h7.value, StateIndex.h2.value, StateIndex.h5.value, StateIndex.h8.value, StateIndex.h3.value, StateIndex.h6.value]
-    # common_ground_indices = [StateIndex.xl.value, StateIndex.yl.value]
-    # a_s = [-100, -10, -100, -10, -10e3, -150, -6e3, -150, 20, -50, 20, -50, -100, -100, -100, -100, -100, -100, -10e3, -6e3]
-    # b_s = [100,   10,  100,  10,  10e3,  150,  6e3,  150, 300, 50, 500, 50,  100,  100,  100,  100,  100,  100,  10e3,  6e3]
 
-    # aug_means = (np.asarray(a_s) + np.asarray(b_s)) / 2
-    # aug_covs = np.square(np.asarray(b_s) - np.asarray(a_s)) / 12
+    def __init__(self, det, wx, wy, vmax,dt=1/30,H=None,H_P=None,H_Q=None,alpha_cov=1,InvA_orig=None,maneuver_time=2):
+        # xl, vxl, axl, yl, vyl, ayl, h1, h4, h7, h2, h5, h8, h3, h6
+        self.alpha = alpha = 1 / maneuver_time
 
-    d_feet_d_img = np.array(  # xc, vxc, yc, vyc, w, vw, h, vh
-            [[1, 0, 0, 0, 0, 0, 0, 0,],
-             [0, 0, 1, 0, 0, 0, 0.5, 0]]
-        )
-    
-    d_img_d_feet = np.array(
-        [[1, 0],
-         [0, 1],
-         [0, 2]]
-    )
-
-    def __init__(self, det, wx, wy, vmax,dt=1/30,H=None,H_P=None,H_Q=None,alpha_cov=1,InvA_orig=None):
-        # xl, vxl, yl, vyl, xc, vxc, yc, vyc, w, vw, h, vh, h1, h4, h7, h2, h5, h8, h3, h6
-        self.kf = KalmanFilter(dim_x=12, dim_z=2)
-        self.motion_transition_mat = np.array([[1, dt, 0, 0], [0, 1, 0, 0], [0, 0, 1, dt], [0, 0, 0, 1]])
+        self.kf = KalmanFilter(dim_x=14, dim_z=2)
+        self.motion_transition_mat = np.array([[1, dt, 1 / (alpha**2) * (-1 + alpha * dt + np.e**(-alpha*dt))], 
+                                               [0, 1, 1 / alpha * (1 - np.e**(-alpha*dt))], 
+                                               [0, 0, np.e**(-alpha*dt)]])
+        self.motion_transition_mat = scipy.linalg.block_diag(self.motion_transition_mat, self.motion_transition_mat)
 
         self.A = np.r_[H, [1]].reshape((3, 3)).T
         self.InvA = np.linalg.inv(self.A)
@@ -90,29 +70,30 @@ class KalmanTracker(object):
 
         self.R = scipy.linalg.block_diag(r_local, det_R)
 
-        self.kf.x[0] = x_local[0] #xl
-        self.kf.x[1] = 0 #vxl
-        self.kf.x[2] = x_local[1] #yl
-        self.kf.x[3] = 0 #vyl
+        self.kf.x[StateIndex.xl.value] = x_local[0] #xl
+        self.kf.x[StateIndex.vxl.value] = 0 #vxl
+        self.kf.x[StateIndex.axl.value] = 0 #vxl
+        self.kf.x[StateIndex.yl.value] = x_local[1] #yl
+        self.kf.x[StateIndex.vyl.value] = 0 #vyl
+        self.kf.x[StateIndex.ayl.value] = 0 #vyl
         self.kf.x[-8:, 0] = H
 
-        self._std_weight_position = 1 / 20 #* (dt / 0.04)
-        self._std_weight_velocity = 1 / 160 * (dt / 0.04)
-
-        self.kf.P = np.zeros((4, 4))
-        np.fill_diagonal(self.kf.P, np.array([1, (vmax / 3)**2, 1,  (vmax / 3)**2]))
-        self.kf.P[[0, 2], 0] = (1 * r_local)[:, 0]
-        self.kf.P[[0, 2], 2] = (1 * r_local)[:, 1]
+        self.kf.P = np.zeros((6, 6))
+        np.fill_diagonal(self.kf.P, np.array([1, (vmax / 3)**2, wx ** 2, 1,  (vmax / 3)**2, wy ** 2]))
+        self.kf.P[[StateIndex.xl.value, StateIndex.yl.value], StateIndex.xl.value] = (1 * r_local)[:, 0]
+        self.kf.P[[StateIndex.xl.value, StateIndex.yl.value], StateIndex.yl.value] = (1 * r_local)[:, 1]
 
         self.kf.P = scipy.linalg.block_diag(*(self.kf.P, H_P))
-    
-        G = np.zeros((4, 2))
-        G[0,0] = 0.5*dt*dt
-        G[1,0] = dt
-        G[2,1] = 0.5*dt*dt
-        G[3,1] = dt
-        Q0 = np.array([[wx, 0], [0, wy]])
-        self.Q = np.dot(np.dot(G, Q0), G.T)
+
+        self.Q =np.array([
+            [1 / (2 * alpha**5) * (1 - np.e**(-2*alpha*dt) + 2*alpha*dt + 2*alpha**3*dt**3/3 - 2*alpha**2*dt**2 - 4*alpha*dt*np.e**(-alpha*dt)), 1/(2*alpha**4) * (np.e**(-2*alpha*dt) + 1 - 2*np.e(-alpha*dt) + 2*alpha*dt*np.e**(-alpha*dt) - 2*alpha*dt + alpha**2*dt**2), 1/(2*alpha**3)*(1 - np.e**(-2*alpha*dt) - 2*alpha*dt*np.e**(-alpha*dt))],
+            [0, 1/(2*alpha**3)*(4*np.e**(-alpha*dt)-3-np.e**(-2*alpha*dt)+2*alpha*dt), 1/(2**alpha**2)*(np.e**(-2*alpha*dt) + 1 -2*np.e**(-alpha*dt))],
+            [0, 0, 1/(2*alpha) * (1 - np.e**(-2*alpha*dt))]
+        ])
+        self.Q[1,0] = self.Q[0,1]
+        self.Q[2,0] = self.Q[0,2]
+        self.Q[2,1] = self.Q[1,2]
+        self.Q = scipy.linalg.block_diag(2 * alpha * wx ** 2 * self.Q, 2 * alpha * wy ** 2 * self.Q)
         self.H_Q = H_Q
 
         self.id = KalmanTracker.count
@@ -134,6 +115,7 @@ class KalmanTracker(object):
         self.g_mahala = 0
 
         self.dt = dt
+        self.uv =  np.array([det.foot_x, det.foot_y]).astype(int)
 
         # Reference https://github.com/rlabbe/filterpy/blob/master/filterpy/kalman/IMM.py#L227
         mu = [0.5, 0.5]  # filter proba: ground, img
@@ -163,7 +145,6 @@ class KalmanTracker(object):
     def xy2uv(self, xy, sigma_xy):
         A = self.A
 
-        xy = self.kf.x[[0, 2], :]
         xy1 = np.ones((3, 1))
         xy1[:2, :] = xy
 
@@ -205,7 +186,7 @@ class KalmanTracker(object):
     def update(self, y, R, relative_iou, relative_p):
         A = self.A
 
-        xy = self.kf.x[[0, 2], :]
+        xy = self.kf.x[[StateIndex.xl.value, StateIndex.yl.value], :]
         xy1 = np.ones((3, 1))
         xy1[:2, :] = xy
 
@@ -222,141 +203,100 @@ class KalmanTracker(object):
         
         dU_dX = gamma * A[:2, :2] - (gamma**2) * b[:2,:] * A[2, :2]
 
-        # dU_dU = np.array(
-        #     [[1, 0, 0, 0],
-        #      [0, 1, 0, 0.5]]
-        # )
-
-        # jacobian[:2, [0, 2]] = np.eye(2)
-        # jacobian[:2, -8:] = dU_dA
-        jacobian[:2, [0, 2]] = dU_dX
+        jacobian[:2, [StateIndex.xl.value, StateIndex.yl.value]] = dU_dX
         jacobian[:2, -8:] = dU_dA
-        # jacobian[2:4, [StateIndex.xc.value, StateIndex.yc.value, StateIndex.w.value, StateIndex.h.value]] = dU_dU
-        # jacobian[-1, StateIndex.w.value] = 1
-
-        # y_G, R_G, _ = self.uv2xy(y[2:4], R[2:4, 2:4], self.kf.P[-8:, -8:])
-
-        # diff = np.r_[y_G, y[2:]] - np.r_[xy, uv_proj, self.kf.x[[StateIndex.w.value], :]]
         diff = y[2:4] - uv_proj
 
-        # S_0 = np.dot(jacobian[:2], np.dot(self.kf.P,jacobian[:2].T)) + R_G
         S_0 = np.dot(jacobian[:2], np.dot(self.kf.P,jacobian[:2].T)) + self.R[2:4, 2:4]
         SI_0 = np.linalg.inv(S_0)
 
-        # S_1 = np.dot(jacobian[2:], np.dot(self.kf.P,jacobian[2:].T)) + self.R[2:, 2:]#R[2:, 2:]#
-        # SI_1 = np.linalg.inv(S_1)
-
-        # update mode probabilities from total probability * likelihood
         mahala1 = diff[:2].T@SI_0@diff[:2]
         self.likelihood[0] = relative_p
         # np.exp(
         #     -0.5 * (np.log(np.linalg.det(2*np.pi*S_0)) + mahala1)
         # )
         self.g_mahala = relative_p
-        # if np.isnan(self.likelihood[0]):
-        #     self.likelihood[0] = 1e-6
-        
         self.likelihood[1] = relative_iou
-        # np.exp(
-        #     -0.5 * (np.log(np.linalg.det(2*np.pi*S_0)) + scipy.stats.chi2.ppf(1 - relative_iou, df=2))
-        # )
         self.relative_iou = relative_iou
-        # self.likelihood[1] = np.exp(
-        #     -0.5 * (np.log(np.linalg.det(2*np.pi*S_1)) + diff[2:].T@SI_1@diff[2:])
-        # )
         self.mu = self.cbar * self.likelihood
         self.mu /= np.sum(self.mu)  # normalize
 
         self._compute_mixing_probabilities()
 
-        if mahala1 < 1000:
+        if mahala1 < np.inf:
             kalman_gain = self.kf.P @ jacobian[:2].T @ SI_0
 
             self.kf.x = self.kf.x + kalman_gain @ diff[:2]
             self.kf.P = (np.eye(self.kf.P.shape[0]) - kalman_gain @ jacobian[:2]) @ self.kf.P
 
-            self.innov_list.append(diff[:2] @ diff[:2].T)
-            if len(self.innov_list) > 5:
-                self.innov_list.pop(0)
-            self.H_Q = (kalman_gain @ np.mean(self.innov_list, axis=0) @ kalman_gain.T)[-8:, -8:]
+            if self.death_count > 1 or not len(self.innov_list):
+                self.innov_list = [diff[:2] @ diff[:2].T]
+            else:
+                self.innov_list.append(diff[:2] @ diff[:2].T)
+                if len(self.innov_list) > 5:
+                    self.innov_list.pop(0)
+            new_pcov = (kalman_gain @ np.mean(self.innov_list, axis=0) @ kalman_gain.T)
+            self.H_Q = new_pcov[-8:, -8:]
 
-            # kalman_gain = self.kf.P @ jacobian[2:].T @ SI_1
+        self.A = np.r_[self.kf.x[-8:, 0], [1]].reshape((3, 3)).T
+        self.InvA = np.linalg.inv(self.A)
 
-            # self.kf.x = self.kf.x + kalman_gain @ diff[2:]
-            # self.kf.P = (np.eye(self.kf.P.shape[0]) - kalman_gain @ jacobian[2:]) @ self.kf.P
+        xy1[:2, :] = self.kf.x[[StateIndex.xl.value, StateIndex.yl.value], :]
 
-            self.A = np.r_[self.kf.x[-8:, 0], [1]].reshape((3, 3)).T
-            self.InvA = np.linalg.inv(self.A)
+        b = self.A @ xy1
+        gamma = 1 / b[2,:]
+        uv_proj = b[:2,:] * gamma
 
-            xy1[:2, :] = self.kf.x[[0, 2], :]
+        self.uv = uv_proj[:2, 0].astype(int)
 
-            b = self.A @ xy1
-            gamma = 1 / b[2,:]
-            uv_proj = b[:2,:] * gamma
+        residual = y[2:4] - uv_proj
 
-            residual = y[2:4] - uv_proj
-
+        if self.death_count > 1 or not len(self.residual_list):
+            self.residual_list = [residual @ residual.T]
+        else:
             self.residual_list.append(residual @ residual.T)
             if len(self.residual_list) > 5:
                 self.residual_list.pop(0)
-            self.R = np.mean(self.residual_list, axis=0) + (S_0 - self.R[2:4, 2:4])
-            b = np.dot(self.InvA_orig, np.r_[uv_proj, [[1]]])
-            gamma = 1 / b[2,:]
-            dX_dU = gamma * self.InvA_orig[:2, :2] - (gamma**2) * b[:2,:] * self.InvA_orig[2, :2]  # dX/du
-            self.R = scipy.linalg.block_diag(dX_dU @ self.R[:2, :2] @ dX_dU.T, self.R)
-
-        self.box_buffer.append(y[4:8].squeeze())
         if self.death_count > 1:
             self.box_buffer = [y[4:8].squeeze()]
-        if len(self.box_buffer) > 5:
-            self.box_buffer.pop(0)
+        else:
+            self.box_buffer.append(y[4:8].squeeze())
+            if len(self.box_buffer) > 5:
+                self.box_buffer.pop(0)
+
+        self.R = np.mean(self.residual_list, axis=0) + (S_0 - self.R[2:4, 2:4])
+        b = np.dot(self.InvA_orig, np.r_[uv_proj, [[1]]])
+        gamma = 1 / b[2,:]
+        dX_dU = gamma * self.InvA_orig[:2, :2] - (gamma**2) * b[:2,:] * self.InvA_orig[2, :2]  # dX/du
+        self.R = scipy.linalg.block_diag(dX_dU @ self.R[:2, :2] @ dX_dU.T, self.R)
 
     def compute_mixed_initial(self):
         # compute mixed initial conditions
 
-        x_ground_aug = self.kf.x.copy()
-        self.cov_ground_aug = self.kf.P.copy()
-
-        x_img_aug = self.kf.x.copy()
-        self.cov_img_aug = self.kf.P.copy()
-
         # Transform states so that they can be mixed
-        ground_to_feet, P_d_feet_d_ground, jac_d_feet_d_ground = self.xy2uv(x_ground_aug[[StateIndex.xl.value, StateIndex.yl.value], :], 
-                                                                    self.cov_ground_aug[self.ground_filter_indices, :][:, self.ground_filter_indices])
-        P_d_img_d_ground = self.d_img_d_feet @ P_d_feet_d_ground @ self.d_img_d_feet.T  # 3x3
-        x_ground_aug[[StateIndex.xc.value, StateIndex.yc.value, StateIndex.h.value], :] = [ground_to_feet[0, :], ground_to_feet[1, :] - x_ground_aug[StateIndex.h.value, :] / 2, 2 * (ground_to_feet[1, :] - x_ground_aug[StateIndex.yc.value, :])]
-        self.cov_ground_aug[[StateIndex.xc.value, StateIndex.yc.value, StateIndex.h.value], StateIndex.xc.value] = P_d_img_d_ground[:, 0]
-        self.cov_ground_aug[[StateIndex.xc.value, StateIndex.yc.value, StateIndex.h.value], StateIndex.yc.value] = P_d_img_d_ground[:, 1]
-        self.cov_ground_aug[[StateIndex.xc.value, StateIndex.yc.value, StateIndex.h.value], StateIndex.h.value] = P_d_img_d_ground[:, 2]
+        last_feet = self.box_buffer[-1].copy()
+        last_feet[0] += (last_feet[2] - last_feet[0]) / 2
+        last_feet[1] += (last_feet[3] - last_feet[1])
+        last_feet = last_feet[:2, None]
 
-        feet_to_ground, P_d_ground_d_img, jac_d_ground_d_img = self.uv2xy(x_img_aug[[StateIndex.xc.value, StateIndex.yc.value], :] + np.asarray([[0], [x_img_aug[StateIndex.h.value, 0]]]) / 2,
-                                                                          self.d_feet_d_img @ self.cov_img_aug[self.img_filter_indices, :][:, self.img_filter_indices] @ self.d_feet_d_img.T,
-                                                                          self.cov_img_aug[-8:, -8:])
-        x_img_aug[[StateIndex.xl.value, StateIndex.yl.value], :] = feet_to_ground
-        self.cov_img_aug[[StateIndex.xl.value, StateIndex.yl.value], StateIndex.xl.value] = P_d_ground_d_img[:, 0]
-        self.cov_img_aug[[StateIndex.xl.value, StateIndex.yl.value], StateIndex.yl.value] = P_d_ground_d_img[:, 1]
+        g_pos, sigma_rg, jac = self.uv2xy(last_feet, np.array([[13 ** 2, 0], [0, 10 ** 2]]), self.kf.P[-8:, -8:])
+        
 
         # Mix
         omega = self.omega.T
         
-        new_x_ground_aug = omega[0, 0] * x_ground_aug + omega[0, 1] * x_img_aug
-        y1, y2 = x_ground_aug - new_x_ground_aug, x_img_aug - new_x_ground_aug
-        new_cov_ground_aug = omega[0, 0] * (np.outer(y1, y1) + self.cov_ground_aug) + omega[0, 1] * (np.outer(y2, y2) + self.cov_img_aug)
+        new_x = omega[0, 0] * self.kf.x[[StateIndex.xl.value, StateIndex.yl.value], :] + omega[0, 1] * g_pos
+        y1, y2 = self.kf.x[[StateIndex.xl.value, StateIndex.yl.value], :] - new_x, g_pos - new_x
+        new_cov = omega[0, 0] * (np.outer(y1, y1) + self.kf.P[[StateIndex.xl.value, StateIndex.yl.value], :][:, [StateIndex.xl.value, StateIndex.yl.value]]) + omega[0, 1] * (np.outer(y2, y2) + sigma_rg)
 
-        new_x_img_aug = omega[1, 0] * x_ground_aug + omega[1, 1] * x_img_aug
-        y1, y2 = x_ground_aug - new_x_img_aug, x_img_aug - new_x_img_aug
-        new_cov_img_aug = omega[1, 0] * (np.outer(y1, y1) + self.cov_ground_aug) + omega[1, 1] * (np.outer(y2, y2) + self.cov_img_aug)
+        self.kf.x[[StateIndex.xl.value, StateIndex.yl.value], :] = new_x
+        self.kf.P[[StateIndex.xl.value, StateIndex.yl.value], StateIndex.xl.value] = new_cov[:, 0]
+        self.kf.P[[StateIndex.xl.value, StateIndex.yl.value], StateIndex.yl.value] = new_cov[:, 1]
 
-        self.kf.x[self.ground_filter_indices, :] = new_x_ground_aug[self.ground_filter_indices, :]
-        self.kf.x[self.img_filter_indices, :] = new_x_img_aug[self.img_filter_indices, :]
-
-        for idx in self.ground_filter_indices:
-            self.kf.P[idx] = new_cov_ground_aug[idx]
-        for idx in self.img_filter_indices:
-            self.kf.P[idx] = new_cov_img_aug[idx]
 
     def predict(self, affine):
-        # self.compute_mixed_initial()
+        if self.death_count == 1:
+            self.compute_mixed_initial()
 
         self.kf.F = scipy.linalg.block_diag(
             *(
@@ -380,6 +320,9 @@ class KalmanTracker(object):
         self.A = np.r_[self.kf.x[-8:, 0], [1]].reshape((3, 3)).T
         self.InvA = np.linalg.inv(self.A)
 
+        b = np.dot(self.A, np.array([[self.kf.x[StateIndex.xl.value, 0]], [self.kf.x[StateIndex.yl.value, 0]], [1]]))
+        self.uv = (b[:2, 0] / b[-1, 0]).astype(int)  # image proj
+
         if len(self.box_buffer) > 1:
             self.box_pred = self.box_buffer[-1] + self.death_count * np.mean(
                 np.array(self.box_buffer)[1:] - np.array(self.box_buffer[:-1]), 
@@ -397,13 +340,13 @@ class KalmanTracker(object):
         return uv, sigma_uv
     
     def distance(self, y, R):
-        b = np.dot(self.A, np.array([[self.kf.x[0, 0]], [self.kf.x[2, 0]], [1]]))
+        b = np.dot(self.A, np.array([[self.kf.x[StateIndex.xl.value, 0]], [self.kf.x[StateIndex.yl.value, 0]], [1]]))
         uv = b / b[-1, 0]  # image proj
         gamma = 1 / b[2, :]  # gamma to image
         dU_dX = gamma * self.A[:2, :2] - (gamma**2) * b[:2,:] * self.A[2, :2]
 
-        self_xy = np.array([[self.kf.x[0, 0]],
-                            [self.kf.x[2, 0]]])
+        self_xy = np.array([[self.kf.x[StateIndex.xl.value, 0]],
+                            [self.kf.x[StateIndex.yl.value, 0]]])
         dU_dA = gamma * np.array([
             [self_xy[0, 0], 0, -self_xy[0, 0] * uv[0, 0], self_xy[1, 0], 0, -uv[0, 0] * self_xy[1, 0], 1, 0],
             [0, self_xy[0, 0], -self_xy[0, 0] * uv[1, 0], 0, self_xy[1, 0], -uv[1, 0] * self_xy[1, 0], 0, 1]
@@ -415,26 +358,12 @@ class KalmanTracker(object):
         dX_dU = gamma * self.InvA_orig[:2, :2] - (gamma**2) * b[:2,:] * self.InvA_orig[2, :2]  # dX/du
 
         jacobian = np.zeros((2, self.kf.dim_x))
-        jacobian[:2, [0, 2]] = dX_dU @ dU_dX
+        jacobian[:2, [StateIndex.xl.value, StateIndex.yl.value]] = dX_dU @ dU_dX
         jacobian[:2, -8:] = dX_dU @ dU_dA
-        # jacobian[:2, [0, 2]] = dU_dX
-        # jacobian[:2, -8:] = dU_dA
-
-        # jacobian[2:4, [StateIndex.xc.value, StateIndex.yc.value, StateIndex.w.value, StateIndex.h.value]] = np.array(
-        #     [[1, 0, 0, 0],
-        #      [0, 1, 0, 0.5]]
-        # )
-        # jacobian[-1,  StateIndex.w.value] = 1
-
-        # self_xy = np.r_[self_xy[:2, :], uv[:2, :], [self.kf.x[StateIndex.w.value]]]
-        # self_xy = np.r_[uv[:2, :], uv[:2, :], [self.kf.x[StateIndex.w.value]]]
 
         y = np.array(y)
         diff = (y[:, :2] - self_xy[:2])
         # R = np.array(R)
-        # diff = (np.array(y)[:, [2, 3, 2, 3, 4]] - self_xy)
-        # R = np.array(R)
-        # R[:, :2, :2] = R[:, 2:4, 2:4]
 
         S1 = np.dot(jacobian[:2], np.dot(self.kf.P,jacobian[:2].T)) + np.repeat(np.expand_dims(self.R[:2, :2], 0), len(y), 0)
         SI = np.linalg.inv(S1)
@@ -462,20 +391,8 @@ class KalmanTracker(object):
         proba_1 = 1 - scipy.stats.chi2.cdf(mahalanobis_1.squeeze() + logdet1, df=2)
         # proba_1 = proba_1 * proba_1 / (proba_1.sum() if proba_1.sum() > 0 else 1)
 
-        proba = self.cbar[0] * (proba_1) + self.cbar[1] * bious
+        # proba = (self.cbar[0] * proba_1 + self.cbar[1] * bious) #* np.e ** (-(self.death_count - 1)/5)
+        proba = proba_1 * bious
 
         return 1 - proba, bious, proba_1
-
-        # S2 = np.dot(jacobian[2:], np.dot(self.kf.P,jacobian[2:].T)) + np.repeat(np.expand_dims(self.R[2:, 2:], 0), len(y), 0)#R[:, 2:, 2:]#
-        # SI = np.linalg.inv(S2)
-        # mahalanobis_2 = diff[:, 2:].transpose(0, 2, 1) @ SI @ diff[:, 2:]
-        # try:
-        #     logdet2 = np.linalg.det(S2)
-        #     logdet2 = np.log(logdet2)
-        # except (RuntimeWarning, LinAlgError):
-        #     logdet2 = 6000
-        # logdet2[np.isnan(logdet2)] = 6000
-        
-        # return mahalanobis_1.squeeze() + mahalanobis_2.squeeze() + logdet1
-        # return np.atleast_1d(self.cbar[0] * (mahalanobis_1.squeeze()) + self.cbar[1] * (mahalanobis_2.squeeze())) + logdet1
     
