@@ -92,7 +92,7 @@ def readCamParaFile(camera_para):
 
 class Mapper(object):
     sigma_m = 0.05
-    def __init__(self, campara_file,dataset= "kitti",process_alpha=0,noise_degree=0,frame_width=1920,frame_height=1080,dt=1/30,sigma_m=0.05):
+    def __init__(self, campara_file,dataset= "kitti",process_alpha=-29,noise_degree=0,frame_width=1920,frame_height=1080,dt=1/30,sigma_m=0.05):
         self.A = np.zeros((3, 3))
         if dataset == "kitti":
             self.KiKo, self.is_ok = readKittiCalib(campara_file)

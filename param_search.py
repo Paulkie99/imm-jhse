@@ -7,17 +7,18 @@ import time
 import numpy as np
 from pymoo.problems.functional import FunctionalProblem
 from pymoo.algorithms.soo.nonconvex.pattern import PatternSearch
-from pymoo.algorithms.moo.rnsga3 import RNSGA3
 from pymoo.optimize import minimize
 from pymoo.termination import get_termination
 from pymoo.util.display.column import Column
 from pymoo.util.display.output import Output
 from scipy import interpolate
 from detector.detector import Detector
-from eval_mot17 import eval_AssA
+from eval_mot17 import eval_AssA as eval_MOT17
+from eval_dance import eval_AssA as eval_Dance
 from tracker.ucmc import UCMCTrack
-from util.run_ucmc import Tracklet, run_ucmc, make_args
+from util.run_ucmc import Tracklet, make_args
 from eval.interpolation import interpolate
+import configparser
 
 def make_args():
     parser = argparse.ArgumentParser(description='Process some arguments.')
@@ -29,7 +30,7 @@ def make_args():
     parser.add_argument('--a', type=float, default=10.0, help='assignment threshold')
     parser.add_argument('--cdt', type=float, default=30.0, help='coasted deletion time')
     parser.add_argument('--high_score', type=float, default=0.6, help='high score threshold')
-    parser.add_argument('--conf_thresh', type=float, default=0.5, help='detection confidence threshold')
+    parser.add_argument('--conf_thresh', type=float, default=0.1, help='detection confidence threshold')
     parser.add_argument("--cmc", action="store_true", help="use cmc or not.")
     parser.add_argument("--hp", action="store_true", help="use head padding or not.")
     parser.add_argument('--u_ratio', type=float, default=0.05, help='assignment threshold')
@@ -37,7 +38,7 @@ def make_args():
     parser.add_argument('--u_max', type=float, default=13, help='assignment threshold')
     parser.add_argument('--v_max', type=float, default=10, help='assignment threshold')
     parser.add_argument("--add_cam_noise", type=float, default=0, help="add noise to camera parameter.")
-    parser.add_argument("--P", type=float, default=1)
+    parser.add_argument("--P", type=float, default=-29)
     parser.add_argument("--sigma_m", type=float, default=0.05)
     parser.add_argument("--frame_width", type=float, default=1920)
     parser.add_argument("--frame_height", type=float, default=1080)
@@ -65,12 +66,13 @@ def run_param_search(x,
                         dataset = "MOT17"):
     
     print(f"params: {x}")
-    wx, wy, a, vmax, P = x
+    wx, wy, a, vmax, t_m = x
 
     if os.path.exists(out_path):
         shutil.rmtree(out_path)
 
     seq_name = args.seq
+    config_parser = configparser.ConfigParser()
 
     eval_path = os.path.join(out_path,exp_name)
     orig_save_path = os.path.join(eval_path,seq_name)
@@ -81,10 +83,17 @@ def run_param_search(x,
         det_file = os.path.join(det_path, f"{seq_name}-SDP.txt")
         cam_para = os.path.join(cam_path, f"{seq_name}-SDP.txt")
         result_file = os.path.join(orig_save_path,f"{seq_name}-SDP.txt")
-    elif dataset == "MOT20":
+        config_parser.read(f"data/MOT17/train/{seq_name}-SDP/seqinfo.ini")
+    else:
         det_file = os.path.join(det_path, f"{seq_name}.txt")
         cam_para = os.path.join(cam_path, f"{seq_name}.txt")
         result_file = os.path.join(orig_save_path,f"{seq_name}.txt")
+        config_parser.read(f"data/{dataset}/{exp_name}/{seq_name}/seqinfo.ini")
+    
+    args.fps = float(config_parser['Sequence']['frameRate'])
+    args.frame_width = float(config_parser['Sequence']['imWidth'])
+    args.frame_height = float(config_parser['Sequence']['imHeight'])
+    print(args.fps)
 
     gmc_file = os.path.join(gmc_path, f"GMC-{seq_name}.txt")
 
@@ -92,7 +101,7 @@ def run_param_search(x,
     print(cam_para)
 
     detector = Detector(args.add_cam_noise, args.frame_width, args.frame_height, 1/args.fps)
-    detector.load(cam_para, det_file,gmc_file,P)
+    detector.load(cam_para, det_file,gmc_file,args.P)
     print(f"seq_length = {detector.seq_length}")
 
     a1 = a
@@ -103,7 +112,7 @@ def run_param_search(x,
     cdt = args.cdt
     conf_thresh = args.conf_thresh
 
-    tracker = UCMCTrack(a1, a2, wx,wy,vmax, cdt, fps, dataset, high_score,args.cmc,detector)
+    tracker = UCMCTrack(a1, a2, wx,wy,vmax, cdt, fps, dataset, high_score,args.cmc,detector, t_m)
 
     t1 = time.time()
 
@@ -112,7 +121,7 @@ def run_param_search(x,
     with open(result_file,"w") as f:
         for frame_id in range(1, detector.seq_length + 1):
             frame_affine = detector.gmc.get_affine(frame_id)
-            dets = detector.get_dets(frame_id, conf_thresh)
+            dets = detector.get_dets(frame_id, conf_thresh, 1 if "oracle" in det_path else 0)
             frametime = time.time()
             try:
                 tracker.update(dets,frame_id,frame_affine)
@@ -162,15 +171,9 @@ def run_param_search(x,
         return 0
     print(f"Time cost: {time.time() - t1:.2f}s")
 
-    return eval_AssA(wx, wy, a, vmax)
+    return eval_MOT17(wx, wy, a, vmax) if "MOT" in dataset else eval_Dance(wx, wy, a, vmax)
 
-def run_pattern_search(seq, seq_params):
-    det_path = "det_results/mot17/yolox_x_ablation"
-    cam_path = "cam_para/MOT17"
-    gmc_path = "gmc/mot17"
-    out_path = "output/mot17"
-    exp_name = "val"
-    dataset = "MOT17"
+def run_pattern_search(seq, seq_params, det_path, cam_path, gmc_path, out_path, exp_name, dataset):
     args = make_args()
 
     print(seq_params)
@@ -202,12 +205,12 @@ def run_pattern_search(seq, seq_params):
     n_var = 5
 
     # vars
-    # wx, wy, a, vmax, P, sigma_m
+    # wx, wy, a, vmax, t_m
     problem = FunctionalProblem(
         n_var,
         obj,
-        xl=np.array([0.001, 0.001, 1,   0.001, -32]),
-        xu=np.array([5,     5,     100, 3,      3])
+        xl=np.array([0.001, 0.001, 0.5,   0.001, 0.05]),
+        xu=np.array([30,    30,    1,     3,     10])
     )
     # problem = FunctionalProblem(
     #     n_var,
@@ -216,7 +219,7 @@ def run_pattern_search(seq, seq_params):
     #     xu=np.array([100,1])
     # )
 
-    algorithm = PatternSearch(x0=np.array([args.wx, args.wy, args.a, args.vmax, args.P]),
+    algorithm = PatternSearch(x0=np.array([args.wx, args.wy, args.a, args.vmax, 0.5]),
                               init_delta=0.75)
     # algorithm = PatternSearch(x0=np.array([args.a, args.P]),
     #                           init_delta=0.5)
@@ -250,84 +253,40 @@ def run_pattern_search(seq, seq_params):
         "wy": res.X[1], 
         "a": res.X[2],
         "vmax": res.X[3],
-        "P": res.X[4],
+        "t_m": res.X[4],
         "OBJ": res.F[0]
     }
 
 if __name__ == '__main__':
-    sequences = ["MOT17-02", "MOT17-04", "MOT17-05", "MOT17-09", "MOT17-10", "MOT17-11", "MOT17-13"]
+    det_path = "det_results/dance/val_oracle"#"det_results/mot17/yolox_x_ablation"
+    cam_path = "cam_para/DanceTrack"#"cam_para/MOT17"
+    gmc_path = "gmc/dance"#"gmc/mot17"
+    out_path = "output/dance"#"output/mot17"
+    exp_name = "val"
+    dataset = "DanceTrack"#"MOT17"
+
+    # sequences = ["MOT17-02", "MOT17-04", "MOT17-05", "MOT17-09", "MOT17-10", "MOT17-11", "MOT17-13"]
+    sequences = os.listdir(det_path)
+    sequences = [seq.split('.')[0] for seq in sequences]
 
     default_params = {
-    "MOT17-02": {
-        "wx": 1,
-        "wy": 1,
-        "a": 10,
-        "P": -32,
-        "vmax": 0.5,
-        "cdt": 30,
-        "fps": 30
-    },
-    "MOT17-04": {
-        "wx": 1,
-        "wy": 1,
-        "a": 10.0,
-        "P": -32,
-        "vmax": 0.5,
-        "cdt": 30,
-        "fps": 30
-    },
-    "MOT17-05": {
-        "wx": 1,
-        "wy": 1,
-        "a": 10,
-        "P": -32,
-        "vmax": 0.5,
-        "cdt": 10,
-        "fps": 14
-    },
-    "MOT17-09": {
-        "wx": 1,
-        "wy": 1,
-        "a": 10,
-        "P": -32,
-        "vmax": 0.5,
-        "cdt": 30,
-        "fps": 30
-    },
-    "MOT17-10": {
-        "wx": 1,
-        "wy": 1,
-        "a": 10,
-        "P": -32,
-        "vmax": 0.5,
-        "cdt": 10,
-        "fps": 30
-    },
-    "MOT17-11": {
-        "wx": 1,
-        "wy": 1,
-        "a": 10,
-        "P": -32,
-        "vmax": 0.5,
-        "cdt": 10,
-        "fps": 30
-    },
-    "MOT17-13": {
-        "wx": 1,
-        "wy": 1,
-        "a": 10,
-        "P": -32,
-        "vmax": 0.5,
-        "cdt": 10,
-        "fps": 25
-    }
+        seq: {
+            "wx": 5,
+            "wy": 5,
+            "a": 0.99,
+            "P": -32,
+            "vmax": 1,
+            "cdt": 30,
+            "fps": 30
+        }
+        for seq in sequences
     }
     results = {}
     for seq in sequences:
-        results[seq] = run_pattern_search(seq, default_params[seq])
+        results[seq] = run_pattern_search(seq, default_params[seq], det_path, cam_path, gmc_path, out_path, exp_name, dataset)
 
     print(results)
-    out_file = open("param_search_results.json", "w") 
+    out_file = open(f"param_search_results.json_{dataset}_{exp_name}", "w") 
   
     json.dump(results, out_file, indent = 6) 
     

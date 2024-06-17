@@ -31,7 +31,7 @@ def make_args():
     parser.add_argument('--a', type=float, default=10.0, help='assignment threshold')
     parser.add_argument('--cdt', type=float, default=30.0, help='coasted deletion time')
     parser.add_argument('--high_score', type=float, default=0.6, help='high score threshold')
-    parser.add_argument('--conf_thresh', type=float, default=0.5, help='detection confidence threshold')
+    parser.add_argument('--conf_thresh', type=float, default=0.1, help='detection confidence threshold')
     parser.add_argument("--cmc", action="store_true", help="use cmc or not.")
     parser.add_argument("--hp", action="store_true", help="use head padding or not.")
     parser.add_argument('--u_ratio', type=float, default=0.05, help='assignment threshold')
@@ -40,7 +40,7 @@ def make_args():
     parser.add_argument('--v_max', type=float, default=10, help='assignment threshold')
     parser.add_argument("--add_cam_noise", type=float, default=0, help="add noise to camera parameter.")
     parser.add_argument("--axis", type=str, default="z", help="add noise to camera parameter.")
-    parser.add_argument("--P", type=float, default=1)
+    parser.add_argument("--P", type=float, default=-29)
     parser.add_argument("--sigma_m", type=float, default=0.05)
     parser.add_argument("--frame_width", type=float, default=1920)
     parser.add_argument("--frame_height", type=float, default=1080)
@@ -108,7 +108,7 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
     wy = args.wy
     vmax = args.vmax
     
-    tracker = UCMCTrack(a1, a2, wx,wy,vmax, cdt, fps, dataset, high_score,args.cmc,detector)
+    tracker = UCMCTrack(a1, a2, wx,wy,vmax, cdt, fps, dataset, high_score,args.cmc,detector,t_m=5)
 
     t1 = time.time()
 

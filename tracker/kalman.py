@@ -79,14 +79,14 @@ class KalmanTracker(object):
         self.kf.x[-8:, 0] = H
 
         self.kf.P = np.zeros((6, 6))
-        np.fill_diagonal(self.kf.P, np.array([1, (vmax / 3)**2, wx ** 2, 1,  (vmax / 3)**2, wy ** 2]))
+        np.fill_diagonal(self.kf.P, np.array([1, (vmax / 3)**2, (wx / 3) ** 2, 1,  (vmax / 3)**2, (wy / 3) ** 2]))
         self.kf.P[[StateIndex.xl.value, StateIndex.yl.value], StateIndex.xl.value] = (1 * r_local)[:, 0]
         self.kf.P[[StateIndex.xl.value, StateIndex.yl.value], StateIndex.yl.value] = (1 * r_local)[:, 1]
 
         self.kf.P = scipy.linalg.block_diag(*(self.kf.P, H_P))
 
         self.Q =np.array([
-            [1 / (2 * alpha**5) * (1 - np.e**(-2*alpha*dt) + 2*alpha*dt + 2*alpha**3*dt**3/3 - 2*alpha**2*dt**2 - 4*alpha*dt*np.e**(-alpha*dt)), 1/(2*alpha**4) * (np.e**(-2*alpha*dt) + 1 - 2*np.e(-alpha*dt) + 2*alpha*dt*np.e**(-alpha*dt) - 2*alpha*dt + alpha**2*dt**2), 1/(2*alpha**3)*(1 - np.e**(-2*alpha*dt) - 2*alpha*dt*np.e**(-alpha*dt))],
+            [1 / (2 * alpha**5) * (1 - np.e**(-2*alpha*dt) + 2*alpha*dt + 2*alpha**3*dt**3/3 - 2*alpha**2*dt**2 - 4*alpha*dt*np.e**(-alpha*dt)), 1/(2*alpha**4) * (np.e**(-2*alpha*dt) + 1 - 2*np.e**(-alpha*dt) + 2*alpha*dt*np.e**(-alpha*dt) - 2*alpha*dt + alpha**2*dt**2), 1/(2*alpha**3)*(1 - np.e**(-2*alpha*dt) - 2*alpha*dt*np.e**(-alpha*dt))],
             [0, 1/(2*alpha**3)*(4*np.e**(-alpha*dt)-3-np.e**(-2*alpha*dt)+2*alpha*dt), 1/(2**alpha**2)*(np.e**(-2*alpha*dt) + 1 -2*np.e**(-alpha*dt))],
             [0, 0, 1/(2*alpha) * (1 - np.e**(-2*alpha*dt))]
         ])
@@ -130,7 +130,7 @@ class KalmanTracker(object):
         # omega[i, j] is the probabilility of mixing the state of filter i into filter j
         self.omega = np.zeros((self.N, self.N))
 
-        self._compute_mixing_probabilities()
+        # self._compute_mixing_probabilities()
 
     def _compute_mixing_probabilities(self):
         """
@@ -221,8 +221,6 @@ class KalmanTracker(object):
         self.mu = self.cbar * self.likelihood
         self.mu /= np.sum(self.mu)  # normalize
 
-        self._compute_mixing_probabilities()
-
         if mahala1 < np.inf:
             kalman_gain = self.kf.P @ jacobian[:2].T @ SI_0
 
@@ -295,8 +293,9 @@ class KalmanTracker(object):
 
 
     def predict(self, affine):
-        if self.death_count == 1:
-            self.compute_mixed_initial()
+        # if self.death_count == 1:
+        self._compute_mixing_probabilities()
+        self.compute_mixed_initial()
 
         self.kf.F = scipy.linalg.block_diag(
             *(
@@ -339,7 +338,7 @@ class KalmanTracker(object):
         sigma_uv[1,1] = v_err*v_err
         return uv, sigma_uv
     
-    def distance(self, y, R):
+    def distance(self, y, R, buf=0.3):
         b = np.dot(self.A, np.array([[self.kf.x[StateIndex.xl.value, 0]], [self.kf.x[StateIndex.yl.value, 0]], [1]]))
         uv = b / b[-1, 0]  # image proj
         gamma = 1 / b[2, :]  # gamma to image
@@ -378,12 +377,12 @@ class KalmanTracker(object):
         # ious = iou_batch(self.box_pred[None, :], np.atleast_2d(y[:, 4:8].squeeze()))
         # weighted_iou = ious * ious / (ious.sum() if ious.sum() > 0 else 1)
 
-        buffered_y = np.c_[y[:, 4] - 0.3 * y[:, 6], y[:, 5] - 0.3 * y[:, 7], y[:, 6] + 2*0.3 * y[:, 6], y[:, 7] + 2*0.3 * y[:, 7]]
+        buffered_y = np.c_[y[:, 4] - buf * y[:, 6], y[:, 5] - buf * y[:, 7], y[:, 6] + 2*buf * y[:, 6], y[:, 7] + 2*buf * y[:, 7]]
         bious = iou_batch(np.array([
-            self.box_pred[0] - 0.3 * self.box_pred[2],
-            self.box_pred[1] - 0.3 * self.box_pred[3],
-            self.box_pred[2] + 2*0.3*self.box_pred[2],
-            self.box_pred[3] + 2*0.3*self.box_pred[3],
+            self.box_pred[0] - buf * self.box_pred[2],
+            self.box_pred[1] - buf * self.box_pred[3],
+            self.box_pred[2] + 2*buf*self.box_pred[2],
+            self.box_pred[3] + 2*buf*self.box_pred[3],
         ])[None, :], buffered_y)
         # weighted_biou = bious * bious / (bious.sum() if bious.sum() > 0 else 1)
         # mahalanobis_2 = np.clip(scipy.stats.chi2.ppf(1 - weighted_biou, df=2), 0, 1000)#(1 - ious) * 7
@@ -391,8 +390,8 @@ class KalmanTracker(object):
         proba_1 = 1 - scipy.stats.chi2.cdf(mahalanobis_1.squeeze() + logdet1, df=2)
         # proba_1 = proba_1 * proba_1 / (proba_1.sum() if proba_1.sum() > 0 else 1)
 
-        # proba = (self.cbar[0] * proba_1 + self.cbar[1] * bious) #* np.e ** (-(self.death_count - 1)/5)
-        proba = proba_1 * bious
+        proba = (self.cbar[0] * proba_1 * bious + self.cbar[1] * bious) #* np.e ** (-(self.death_count - 1)/5)
+        # proba = proba_1 * bious
 
         return 1 - proba, bious, proba_1
     
