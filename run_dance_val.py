@@ -2,7 +2,7 @@ from util.run_ucmc import run_ucmc, make_args
 
 if __name__ == '__main__':
 
-    det_path = "det_results/dance/val"
+    det_path = "det_results/dance/val_oracle"
     cam_path = "cam_para/DanceTrack"
     gmc_path = "gmc/dance"
     out_path = "output/dance"

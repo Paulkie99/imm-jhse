@@ -25,10 +25,10 @@ def make_args():
     parser = argparse.ArgumentParser(description='Process some arguments.')
     parser.add_argument('--seq', type=str, default = "MOT17-02", help='seq name')
     parser.add_argument('--fps', type=float, default=30.0, help='fps')
-    parser.add_argument('--wx', type=float, default=0.1, help='wx')
-    parser.add_argument('--wy', type=float, default=0.1, help='wy')
-    parser.add_argument('--vmax', type=float, default=0.5, help='vmax')
-    parser.add_argument('--a', type=float, default=10.0, help='assignment threshold')
+    parser.add_argument('--wx', type=float, default=0.001, help='wx')
+    parser.add_argument('--wy', type=float, default=5, help='wy')
+    parser.add_argument('--vmax', type=float, default=2.6166484375, help='vmax')
+    parser.add_argument('--a', type=float, default=0.70875, help='assignment threshold')
     parser.add_argument('--cdt', type=float, default=30.0, help='coasted deletion time')
     parser.add_argument('--high_score', type=float, default=0.6, help='high score threshold')
     parser.add_argument('--conf_thresh', type=float, default=0.1, help='detection confidence threshold')
@@ -39,7 +39,7 @@ def make_args():
     parser.add_argument('--u_max', type=float, default=13, help='assignment threshold')
     parser.add_argument('--v_max', type=float, default=10, help='assignment threshold')
     parser.add_argument("--add_cam_noise", type=float, default=0, help="add noise to camera parameter.")
-    parser.add_argument("--P", type=float, default=-29)
+    parser.add_argument("--P", type=float, default=-32)
     parser.add_argument("--sigma_m", type=float, default=0.05)
     parser.add_argument("--frame_width", type=float, default=1920)
     parser.add_argument("--frame_height", type=float, default=1080)
@@ -247,12 +247,12 @@ def run_pattern_search(sequences, seq_params, det_path, cam_path, gmc_path, out_
     }
 
 if __name__ == '__main__':
-    det_path = "det_results/dance/val_oracle"#"det_results/mot17/yolox_x_ablation"
-    cam_path = "cam_para/DanceTrack"#"cam_para/MOT17"
-    gmc_path = "gmc/dance"#"gmc/mot17"
-    out_path = "output/dance"#"output/mot17"
+    det_path = "det_results/mot17/yolox_x_ablation"#"det_results/dance/val_oracle"
+    cam_path = "cam_para/MOT17"#"cam_para/DanceTrack"
+    gmc_path = "gmc/mot17"#"gmc/dance"
+    out_path = "output/mot17"#"output/dance"
     exp_name = "val"
-    dataset = "DanceTrack"#"MOT17"
+    dataset = "MOT17"#"DanceTrack"
 
     # sequences = ["MOT17-02", "MOT17-04", "MOT17-05", "MOT17-09", "MOT17-10", "MOT17-11", "MOT17-13"]
     sequences = os.listdir(det_path)
@@ -271,6 +271,6 @@ if __name__ == '__main__':
     results = run_pattern_search(sequences, default_params, det_path, cam_path, gmc_path, out_path, exp_name, dataset)
 
     print(results)
-    out_file = open(f"param_search_results_{dataset}_{exp_name}.json", "w")   
+    out_file = open(f"param_search_results_{dataset}_{exp_name}_overall.json", "w")   
     json.dump(results, out_file, indent = 6) 
     out_file.close() 

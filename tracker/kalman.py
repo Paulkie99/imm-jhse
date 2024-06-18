@@ -130,7 +130,7 @@ class KalmanTracker(object):
         # omega[i, j] is the probabilility of mixing the state of filter i into filter j
         self.omega = np.zeros((self.N, self.N))
 
-        # self._compute_mixing_probabilities()
+        self._compute_mixing_probabilities()
 
     def _compute_mixing_probabilities(self):
         """
@@ -221,13 +221,15 @@ class KalmanTracker(object):
         self.mu = self.cbar * self.likelihood
         self.mu /= np.sum(self.mu)  # normalize
 
+        self._compute_mixing_probabilities()
+
         if mahala1 < np.inf:
             kalman_gain = self.kf.P @ jacobian[:2].T @ SI_0
 
             self.kf.x = self.kf.x + kalman_gain @ diff[:2]
             self.kf.P = (np.eye(self.kf.P.shape[0]) - kalman_gain @ jacobian[:2]) @ self.kf.P
 
-            if self.death_count > 1 or not len(self.innov_list):
+            if self.death_count > 1:
                 self.innov_list = [diff[:2] @ diff[:2].T]
             else:
                 self.innov_list.append(diff[:2] @ diff[:2].T)
@@ -249,14 +251,16 @@ class KalmanTracker(object):
 
         residual = y[2:4] - uv_proj
 
-        if self.death_count > 1 or not len(self.residual_list):
+        if self.death_count > 1:
             self.residual_list = [residual @ residual.T]
         else:
             self.residual_list.append(residual @ residual.T)
             if len(self.residual_list) > 5:
                 self.residual_list.pop(0)
+
         if self.death_count > 1:
             self.box_buffer = [y[4:8].squeeze()]
+            self.box_pred = self.box_buffer[-1]
         else:
             self.box_buffer.append(y[4:8].squeeze())
             if len(self.box_buffer) > 5:
@@ -291,11 +295,9 @@ class KalmanTracker(object):
         self.kf.P[[StateIndex.xl.value, StateIndex.yl.value], StateIndex.xl.value] = new_cov[:, 0]
         self.kf.P[[StateIndex.xl.value, StateIndex.yl.value], StateIndex.yl.value] = new_cov[:, 1]
 
-
     def predict(self, affine):
-        # if self.death_count == 1:
-        self._compute_mixing_probabilities()
-        self.compute_mixed_initial()
+        if self.death_count == 1:
+            self.compute_mixed_initial()
 
         self.kf.F = scipy.linalg.block_diag(
             *(
