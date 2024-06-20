@@ -5,7 +5,7 @@ from eval.eval import eval
 
 if __name__ == '__main__':
     dataset_path = "./data/DanceTrack/val"
-    out_path = "output/dance"
+    out_path = "run_output/dance"
     exp_name = "val"
 
     seqmap = os.path.join(out_path,exp_name, "val_seqmap.txt")
@@ -21,10 +21,8 @@ if __name__ == '__main__':
     HOTA,IDF1,MOTA,AssA = eval(dataset_path,out_path, seqmap, exp_name,1,False)
     print(f"{HOTA}, {IDF1}, {MOTA}, {AssA}")
 
-def eval_AssA(wx, wy, a, vmax):
+def eval_AssA(wx, wy, a, vmax, out_path, exp_name):
     dataset_path = "./data/DanceTrack/val"
-    out_path = "output/dance"
-    exp_name = "val"
 
     seqmap = os.path.join(out_path,exp_name, "val_seqmap.txt")
 

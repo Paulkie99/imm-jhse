@@ -27,11 +27,12 @@ def make_args():
     parser.add_argument('--fps', type=float, default=30.0, help='fps')
     parser.add_argument('--wx', type=float, default=0.001, help='wx')
     parser.add_argument('--wy', type=float, default=5, help='wy')
-    parser.add_argument('--vmax', type=float, default=2.6166484375, help='vmax')
-    parser.add_argument('--a', type=float, default=0.70875, help='assignment threshold')
+    parser.add_argument('--vmax', type=float, default=2.5, help='vmax')
+    parser.add_argument('--a1', type=float, default=0.99, help='assignment threshold')
+    parser.add_argument('--a2', type=float, default=0.7, help='assignment threshold')
     parser.add_argument('--cdt', type=float, default=30.0, help='coasted deletion time')
-    parser.add_argument('--high_score', type=float, default=0.6, help='high score threshold')
-    parser.add_argument('--conf_thresh', type=float, default=0.1, help='detection confidence threshold')
+    parser.add_argument('--high_score', type=float, default=0.5, help='high score threshold')
+    parser.add_argument('--conf_thresh', type=float, default=0.5, help='detection confidence threshold')
     parser.add_argument("--cmc", action="store_true", help="use cmc or not.")
     parser.add_argument("--hp", action="store_true", help="use head padding or not.")
     parser.add_argument('--u_ratio', type=float, default=0.05, help='assignment threshold')
@@ -41,11 +42,14 @@ def make_args():
     parser.add_argument("--add_cam_noise", type=float, default=0, help="add noise to camera parameter.")
     parser.add_argument("--axis", type=str, default="z", help="add noise to camera parameter.")
     parser.add_argument("--P", type=float, default=-32)
+    parser.add_argument("--t_m", type=float, default=2)
+    parser.add_argument("--t1", type=float, default=0.9)
+    parser.add_argument("--t2", type=float, default=0.5)
     parser.add_argument("--sigma_m", type=float, default=0.05)
     parser.add_argument("--frame_width", type=float, default=1920)
     parser.add_argument("--frame_height", type=float, default=1080)
     parser.add_argument("--param_file", type=str, default='')
-    parser.add_argument("--video", type=bool, default=False)
+    parser.add_argument("--video", action="store_true")
     
     args = parser.parse_args()
 
@@ -80,13 +84,17 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
     for seq in args.seq:
         seq_name = seq
 
-        t_m = 5.7470703125
         if params is not None:
             args.wx = params[seq]['wx']
             args.wy = params[seq]['wy']
-            args.a = params[seq]['a']
+            args.a1 = params[seq]['a1']
+            args.a2 = params[seq]['a2']
             args.vmax = params[seq]['vmax']
-            t_m = params[seq]['t_m']
+            args.t_m = params[seq]['t_m']
+            args.conf_thresh = params[seq]['conf_thresh']
+            args.high_score = params[seq]['high_score']
+            args.t1 = params[seq]['t1']
+            args.t2 = params[seq]['t2']
 
         eval_path = os.path.join(out_path,exp_name)
         orig_save_path = os.path.join(eval_path,seq_name)
@@ -119,8 +127,8 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
         detector.load(cam_para, det_file,gmc_file,args.P,sigma_m=args.sigma_m)
         print(f"seq_length = {detector.seq_length}")
 
-        a1 = args.a
-        a2 = args.a
+        a1 = args.a1
+        a2 = args.a2
         high_score = args.high_score
         conf_thresh = args.conf_thresh
         fps = args.fps
@@ -129,7 +137,7 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
         wy = args.wy
         vmax = args.vmax
         
-        tracker = UCMCTrack(a1, a2, wx,wy,vmax, cdt, fps, dataset, high_score,args.cmc,detector,t_m=t_m)
+        tracker = UCMCTrack(a1, a2, wx,wy,vmax, cdt, fps, dataset, high_score,args.cmc,detector,t_m=args.t_m, t1=args.t1, t2=args.t2)
 
         t1 = time.time()
 

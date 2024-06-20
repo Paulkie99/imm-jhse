@@ -24,13 +24,14 @@ def make_args():
     parser = argparse.ArgumentParser(description='Process some arguments.')
     parser.add_argument('--seq', type=str, default = "MOT17-02", help='seq name')
     parser.add_argument('--fps', type=float, default=30.0, help='fps')
-    parser.add_argument('--wx', type=float, default=0.001, help='wx')
+    parser.add_argument('--wx', type=float, default=5, help='wx')
     parser.add_argument('--wy', type=float, default=5, help='wy')
-    parser.add_argument('--vmax', type=float, default=2.6166484375, help='vmax')
-    parser.add_argument('--a', type=float, default=0.70875, help='assignment threshold')
+    parser.add_argument('--vmax', type=float, default=0.5, help='vmax')
+    parser.add_argument('--a1', type=float, default=0.99, help='assignment threshold')
+    parser.add_argument('--a2', type=float, default=0.7, help='assignment threshold')
     parser.add_argument('--cdt', type=float, default=30.0, help='coasted deletion time')
     parser.add_argument('--high_score', type=float, default=0.6, help='high score threshold')
-    parser.add_argument('--conf_thresh', type=float, default=0.1, help='detection confidence threshold')
+    parser.add_argument('--conf_thresh', type=float, default=0.5, help='detection confidence threshold')
     parser.add_argument("--cmc", action="store_true", help="use cmc or not.")
     parser.add_argument("--hp", action="store_true", help="use head padding or not.")
     parser.add_argument('--u_ratio', type=float, default=0.05, help='assignment threshold')
@@ -39,6 +40,9 @@ def make_args():
     parser.add_argument('--v_max', type=float, default=10, help='assignment threshold')
     parser.add_argument("--add_cam_noise", type=float, default=0, help="add noise to camera parameter.")
     parser.add_argument("--P", type=float, default=-32)
+    parser.add_argument("--t_m", type=float, default=2)
+    parser.add_argument("--t1", type=float, default=0.9)
+    parser.add_argument("--t2", type=float, default=0.9)
     parser.add_argument("--sigma_m", type=float, default=0.05)
     parser.add_argument("--frame_width", type=float, default=1920)
     parser.add_argument("--frame_height", type=float, default=1080)
@@ -66,7 +70,7 @@ def run_param_search(x,
                         dataset = "MOT17"):
     
     print(f"params: {x}")
-    wx, wy, a, vmax, t_m = x
+    wx, wy, a1, a2, vmax, t_m, conf_thresh, high_score, t1, t2 = x
 
     if os.path.exists(out_path):
         shutil.rmtree(out_path)
@@ -104,15 +108,15 @@ def run_param_search(x,
     detector.load(cam_para, det_file,gmc_file,args.P)
     print(f"seq_length = {detector.seq_length}")
 
-    a1 = a
-    a2 = a1
-    high_score = args.high_score
+    a1 = a1
+    a2 = a2
+    # high_score = args.high_score
     fps = args.fps
     # vmax = args.vmax
     cdt = args.cdt
-    conf_thresh = args.conf_thresh
+    # conf_thresh = args.conf_thresh
 
-    tracker = UCMCTrack(a1, a2, wx,wy,vmax, cdt, fps, dataset, high_score,args.cmc,detector, t_m)
+    tracker = UCMCTrack(a1, a2, wx,wy,vmax, cdt, fps, dataset, high_score,args.cmc,detector, t_m, t1=t1, t2=t2)
 
     t1 = time.time()
 
@@ -127,6 +131,8 @@ def run_param_search(x,
                 tracker.update(dets,frame_id,frame_affine)
             except Exception as e:
                 print(e)
+                if os.path.exists(out_path):
+                    shutil.rmtree(out_path)
                 return 0
             if time.time() - frametime >= 0.2:
                 print("Aborting optimistation iteration")
@@ -168,10 +174,12 @@ def run_param_search(x,
         interpolate(orig_save_path, eval_path, n_min=3, n_dti=cdt, is_enable = True)
     except Exception as e:
         print(e)
+        if os.path.exists(out_path):
+            shutil.rmtree(out_path)
         return 0
     print(f"Time cost: {time.time() - t1:.2f}s")
 
-    return eval_MOT17(wx, wy, a, vmax) if "MOT" in dataset else eval_Dance(wx, wy, a, vmax)
+    return eval_MOT17(wx, wy, a1, vmax) if "MOT" in dataset else eval_Dance(wx, wy, a1, vmax, out_path, exp_name)
 
 def run_pattern_search(seq, seq_params, det_path, cam_path, gmc_path, out_path, exp_name, dataset):
     args = make_args()
@@ -182,7 +190,8 @@ def run_pattern_search(seq, seq_params, det_path, cam_path, gmc_path, out_path, 
     args.hp = True
     args.wx = seq_params["wx"]
     args.wy = seq_params["wy"]
-    args.a = seq_params["a"]
+    args.a1 = seq_params["a1"]
+    args.a2 = seq_params["a2"]
     args.vmax = seq_params["vmax"]
     args.fps = seq_params["fps"]
     args.cdt = seq_params["cdt"]
@@ -202,15 +211,15 @@ def run_pattern_search(seq, seq_params, det_path, cam_path, gmc_path, out_path, 
     obj = [
         obj_func
     ]
-    n_var = 5
+    n_var = 10
 
     # vars
-    # wx, wy, a, vmax, t_m
+    # wx, wy, a1, a2, vmax, t_m, conf_thresh, high_score, t1, t2
     problem = FunctionalProblem(
         n_var,
         obj,
-        xl=np.array([0.001, 0.001, 0.5,   0.001, 0.05]),
-        xu=np.array([30,    30,    1,     3,     10])
+        xl=np.array([0.001, 0.001, 0.1, 0.1, 0.001, 1/30, 0.1, 0.1, 0.01, 0.01]),
+        xu=np.array([30,    30,    0.999,0.999,   3, 100, 0.9, 0.9, 0.99, 0.99])
     )
     # problem = FunctionalProblem(
     #     n_var,
@@ -219,7 +228,7 @@ def run_pattern_search(seq, seq_params, det_path, cam_path, gmc_path, out_path, 
     #     xu=np.array([100,1])
     # )
 
-    algorithm = PatternSearch(x0=np.array([args.wx, args.wy, args.a, args.vmax, 0.5]),
+    algorithm = PatternSearch(x0=np.array([args.wx, args.wy, args.a1, args.a2, args.vmax, args.t_m, args.conf_thresh, args.high_score, args.t1, args.t2]),
                               init_delta=0.75)
     # algorithm = PatternSearch(x0=np.array([args.a, args.P]),
     #                           init_delta=0.5)
@@ -244,24 +253,29 @@ def run_pattern_search(seq, seq_params, det_path, cam_path, gmc_path, out_path, 
             self.F.set(algorithm.pop.get("F"))
 
     res = minimize(problem, algorithm, 
-                   get_termination("n_eval", 25 * n_var),
+                   get_termination("n_eval", 10 * n_var),
                    output=MyOutput(),
                    verbose=True, seed=1)
     # print(f"Best solution: \nwx={res.X[0]}\nwy={res.X[1]}\na={res.X[2]}\nvmax={res.X[3]}\P={res.X[4]}\nOBJ={res.F}")
     return {
         "wx": res.X[0],
         "wy": res.X[1], 
-        "a": res.X[2],
-        "vmax": res.X[3],
-        "t_m": res.X[4],
+        "a1": res.X[2],
+        "a2": res.X[3],
+        "vmax": res.X[4],
+        "t_m": res.X[5],
+        "conf_thresh": res.X[6],
+        "high_score": res.X[7],
+        "t1": res.X[8],
+        "t2": res.X[9],
         "OBJ": res.F[0]
     }
 
 if __name__ == '__main__':
-    det_path = "det_results/dance/val_oracle"#"det_results/mot17/yolox_x_ablation"
+    det_path = "det_results/dance/val"#"det_results/mot17/yolox_x_ablation"
     cam_path = "cam_para/DanceTrack"#"cam_para/MOT17"
     gmc_path = "gmc/dance"#"gmc/mot17"
-    out_path = "output/dance"#"output/mot17"
+    out_path = "output_per/dance"#"output/mot17"
     exp_name = "val"
     dataset = "DanceTrack"#"MOT17"
 
@@ -273,9 +287,10 @@ if __name__ == '__main__':
         seq: {
             "wx": 5,
             "wy": 5,
-            "a": 0.99,
+            "a1": 0.99,
+            "a2": 0.7,
             "P": -32,
-            "vmax": 1,
+            "vmax": 0.5,
             "cdt": 30,
             "fps": 30
         }
