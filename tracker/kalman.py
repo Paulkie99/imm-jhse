@@ -754,7 +754,7 @@ class CVHIMM(IMMEstimator):
     def __init__(self, det, wx, wy, vmax,dt=1/30,H=None,H_P=None,H_Q=None, window=5, t1=1-1e-12, t2=1-1e-12):
         self.groundDist = False
         self.dynR = True
-        self.mix = True
+        self.mix = False
         cam_t = 0.9
 
         super().__init__(
