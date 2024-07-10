@@ -23,7 +23,7 @@ def linear_assignment(cost_matrix, thresh):
     return matches, unmatched_a, unmatched_b
 
 class UCMCTrack(object):
-    def __init__(self,a1,a2,wx, wy,vmax, max_age, fps, dataset, high_score, use_cmc,detector = None,t_m=5.7470703125, b1=0.3, b2=0.4, t1=0.9, t2=0.9, window_len=5, a3=0.5, alpha=0):
+    def __init__(self,a1,a2,wx, wy,vmax, max_age, fps, dataset, high_score, use_cmc,detector = None,t_m=5.7470703125, b1=0.3, b2=0.4, t1=0.9, t2=0.9, window_len=5, a3=0.5, alpha=0, ct1=0.9, ct2=0.9):
         CVHIMM.count = 1
 
         self.wx = wx
@@ -41,6 +41,8 @@ class UCMCTrack(object):
         self.b2 = b2
         self.t1 = t1
         self.t2 = t2
+        self.ct1 = ct1
+        self.ct2 = ct2
         self.window_len = window_len
 
         self.use_cmc = use_cmc
@@ -54,8 +56,15 @@ class UCMCTrack(object):
         self.alpha = alpha
 
     def update(self, dets,frame_affine): 
+        camdists = []
         for track in self.trackers:
             track.predict(frame_affine)
+            camdists.append(track.camdist)
+        if len(camdists):
+            min_dist = min(camdists)
+            max_dist = max(camdists)
+            camdists = np.array(camdists)
+            self.track_position_bias = np.exp(-self.alpha*(camdists - min_dist)/max_dist)
 
         self.data_association(dets)
         
@@ -278,7 +287,7 @@ class UCMCTrack(object):
     def initial_tentative(self,dets,H,H_P,H_Q):
         for i in self.detidx_remain: 
             # self.trackers.append(SingerKalmanTracker(dets[i],self.wx,self.wy,self.vmax,self.dt,H,H_P,H_Q, self.t_m, self.t1, self.t2, self.window_len))
-            self.trackers.append(CVHIMM(dets[i],self.wx,self.wy,self.vmax,self.dt,H,H_P,H_Q, window=self.window_len, t1=self.t1, t2=self.t2))
+            self.trackers.append(CVHIMM(dets[i],self.wx,self.wy,self.vmax,self.dt,H,H_P,H_Q, window=self.window_len, t1=self.t1, t2=self.t2, ct1=self.ct1, ct2=self.ct2))
             # self.trackers.append(KalmanTrackerBox(dets[i],self.wx,self.wy,self.vmax,self.dt,H,H_P,H_Q, window=self.window_len, t1=self.t1, t2=self.t2))
             # self.trackers.append(OGKalmanTracker(dets[i].y[:2, :2], dets[i].R[:2, :2],self.wx,self.wy,self.vmax,dets[i].bb_width, dets[i].bb_height,self.dt))
             self.trackers[-1].status = TrackStatus.Tentative
@@ -298,8 +307,6 @@ class UCMCTrack(object):
         self.confirmed_idx = []
         self.coasted_idx = []
         self.tentative_idx = []
-        camdists = []
-        confirmed_dists = []
         detidxs = []
         for i in range(len(self.trackers)):
 
@@ -308,7 +315,6 @@ class UCMCTrack(object):
                 detidxs.append(detidx)
                 self.trackers[i].h = dets[detidx].bb_height
                 self.trackers[i].w = dets[detidx].bb_width
-                confirmed_dists.append(self.trackers[i].camdist[0])
 
             if self.trackers[i].status == TrackStatus.Confirmed:
                 self.confirmed_idx.append(i)
@@ -317,11 +323,6 @@ class UCMCTrack(object):
             elif self.trackers[i].status == TrackStatus.Tentative:
                 self.tentative_idx.append(i)
 
-            camdists.append(self.trackers[i].camdist[0])
-
         assert len(detidxs) == len(set(detidxs))
 
-        camdists = np.array(camdists)
-        min_dist = min(confirmed_dists)
-        max_dist = max(confirmed_dists)
-        self.track_position_bias = np.exp(-self.alpha*(camdists - min_dist)/max_dist)
+        self.track_position_bias = np.ones((len(self.trackers,)))

@@ -751,11 +751,11 @@ class KalmanTrackerDynamic(KalmanTrackerStatic):
 
 class CVHIMM(IMMEstimator):
     count = 1
-    def __init__(self, det, wx, wy, vmax,dt=1/30,H=None,H_P=None,H_Q=None, window=5, t1=1-1e-12, t2=1-1e-12):
+    def __init__(self, det, wx, wy, vmax,dt=1/30,H=None,H_P=None,H_Q=None, window=5, t1=1-1e-12, t2=1-1e-12, ct1=0.9, ct2=0.9):
         self.groundDist = False
         self.dynR = True
         self.mix = False
-        cam_t = 0.9
+        # cam_t = 0.9
 
         super().__init__(
             [
@@ -764,8 +764,8 @@ class CVHIMM(IMMEstimator):
             ],
             [0.5, 0.5],
             np.array([
-                [cam_t, 1-cam_t],
-                [1-cam_t, cam_t]
+                [ct1, 1-ct1],
+                [1-ct2, ct2]
             ])
         )
 
