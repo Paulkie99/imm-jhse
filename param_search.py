@@ -72,7 +72,7 @@ def run_param_search(x,
                         dataset = "MOT17"):
     
     print(f"params: {x}")
-    wx, wy, a1, a2, vmax, conf_thresh, high_score, cdt, b1, a3 = x
+    wx, wy, a1, a2, vmax, conf_thresh, high_score, cdt, b1, a3, t1, t2, ct1, ct2 = x
 
     if os.path.exists(out_path):
         shutil.rmtree(out_path)
@@ -122,7 +122,7 @@ def run_param_search(x,
     # t2 = args.t2 
     window = args.window
 
-    tracker = UCMCTrack(a1, a2, wx,wy,vmax, cdt, fps, dataset, high_score,args.cmc,detector, args.t_m, b1=b1, t1=args.t1, t2=args.t2, window_len=window, a3=a3, alpha=0)
+    tracker = UCMCTrack(a1, a2, wx,wy,vmax, cdt, fps, dataset, high_score,args.cmc,detector, args.t_m, b1=b1, t1=t1, t2=t2, window_len=window, a3=a3, alpha=0, ct1=ct1, ct2=ct2)
 
     timer = time.time()
 
@@ -223,7 +223,7 @@ def run_pattern_search(seq, seq_params, det_path, cam_path, gmc_path, out_path, 
     obj = [
         obj_func
     ]
-    n_var = 10
+    n_var = 14
 
     # vars
     # "wx": 5,
@@ -243,11 +243,11 @@ def run_pattern_search(seq, seq_params, det_path, cam_path, gmc_path, out_path, 
     problem = FunctionalProblem(
         n_var,
         obj,
-        xl=np.array([0.001, 0.001, 0.1, 0.1,  0.001, 0.1, 0.1, 1, 0, 0.1]),
-        xu=np.array([30,    30,    0.99,0.99,3,     0.9, 0.9, 100, 1, 0.99])
+        xl=np.array([0.001, 0.001, 0.1, 0.1,  0.001, 0.1, 0.1, 1, 0, 0.1, 0.01, 0.01, 0.01, 0.01]),
+        xu=np.array([30,    30,    0.99,0.99,3,     0.9, 0.9, 100, 1, 0.99,0.99, 0.99,0.99, 0.99])
     )
 
-    algorithm = PatternSearch(x0=np.array([args.wx, args.wy, args.a1, args.a2, args.vmax, args.conf_thresh, args.high_score, args.cdt, args.b1, args.a3]),
+    algorithm = PatternSearch(x0=np.array([args.wx, args.wy, args.a1, args.a2, args.vmax, args.conf_thresh, args.high_score, args.cdt, args.b1, args.a3, args.t1, args.t2, args.t1, args.t2]),
                               init_delta=0.75)
     # algorithm = PatternSearch(n_sample_points=10,
     #                         init_delta=0.75)
@@ -295,24 +295,26 @@ def run_pattern_search(seq, seq_params, det_path, cam_path, gmc_path, out_path, 
         "b1": res.X[8],
         # "alpha": res.X[11],
         "a3": res.X[9],
-        # "t1": res.X[10],
-        # "t2": res.X[11],
+        "t1": res.X[10],
+        "t2": res.X[11],
+        "ct1": res.X[12],
+        "ct2": res.X[13],
         # "t_m": res.X[13],
         "OBJ": res.F[0]
     }
 
 if __name__ == '__main__':
-    det_path = "det_results/dance/val"#"det_results/mot17/yolox_x_ablation"
-    cam_path = "cam_para/DanceTrack"#"cam_para/MOT17"
-    gmc_path = "gmc/dance"#"gmc/mot17"
-    out_path = "26dynnomixoutput_per_cv_image_BoxIMM_cascaded/dance"#"output/mot17_coast"
+    det_path = "det_results/mot17/yolox_x_ablation"#"det_results/dance/val"#"det_results/mot17/yolox_x_ablation"
+    cam_path = "cam_para/MOT17"#"cam_para/DanceTrack"#"cam_para/MOT17"
+    gmc_path = "gmc/mot17"#"gmc/dance"#"gmc/mot17"
+    out_path = "dynnomixoutput_ct1ct2_per_cv_image_BoxIMM_cascaded/mot17"#"output/mot17_coast"
     exp_name = "val"
-    dataset = "DanceTrack"#"MOT17"
+    dataset = "MOT17"#"DanceTrack"#"MOT17"
 
-    # sequences = ["MOT17-02", "MOT17-04", "MOT17-05", "MOT17-09", "MOT17-10", "MOT17-11", "MOT17-13"]
-    sequences = os.listdir(det_path)
-    sequences = [seq.split('.')[0] for seq in sequences]
-    sequences = ["dancetrack0026"]
+    sequences = ["MOT17-02", "MOT17-04", "MOT17-05", "MOT17-09", "MOT17-10", "MOT17-11", "MOT17-13"]
+    # sequences = os.listdir(det_path)
+    # sequences = [seq.split('.')[0] for seq in sequences]
+    # sequences = ["dancetrack0026"]
 
     default_params = {
         seq: {
@@ -338,7 +340,7 @@ if __name__ == '__main__':
     results = {}
     for seq in sequences:
         results[seq] = run_pattern_search(seq, default_params[seq], det_path, cam_path, gmc_path, out_path, exp_name, dataset)
-        out_file = open(f"26cv_image_BoxIMM_cascaded_per_param_search_results_{dataset}_{exp_name}.json", "w") 
+        out_file = open(f"dynnomix_ct1ct2_cv_image_BoxIMM_cascaded_per_param_search_results_{dataset}_{exp_name}.json", "w") 
         json.dump(results, out_file, indent = 6) 
         out_file.close() 
 
