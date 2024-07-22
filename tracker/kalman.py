@@ -751,11 +751,13 @@ class KalmanTrackerDynamic(KalmanTrackerStatic):
 
 class CVHIMM(IMMEstimator):
     count = 1
-    def __init__(self, det, wx, wy, vmax,dt=1/30,H=None,H_P=None,H_Q=None, window=5, t1=1-1e-12, t2=1-1e-12, ct1=0.9, ct2=0.9):
+    def __init__(self, det, wx, wy, vmax, dt=1/30,H=None,H_P=None,H_Q=None, window=5, t1=1-1e-12, t2=1-1e-12, ct1=0.9, ct2=0.9):
         self.groundDist = False
         self.dynR = True
         self.mix = False
         # cam_t = 0.9
+
+        self.det_class = det.det_class
 
         super().__init__(
             [
@@ -952,7 +954,7 @@ class CVHIMM(IMMEstimator):
         x, y = local_ground_coords[0], local_ground_coords[2]
         self.camdist = np.sqrt((x - self.camx) ** 2 + (y - self.camy) ** 2)
 
-    def distance(self, y, R, buf=0.3):
+    def distance(self, y, R, buf=0.3, det_classes=None):
         A = np.r_[self.x[-8:, 0], [1]].reshape((3, 3)).T
         b = np.dot(A, np.array([[self.x[StateIndexCV.xl.value, 0]], [self.x[StateIndexCV.yl.value, 0]], [1]]))
         uv = b / b[-1, 0]  # image proj
@@ -1015,8 +1017,12 @@ class CVHIMM(IMMEstimator):
         ])[None, :], buffered_y)
 
         proba_1 = 1 - scipy.stats.chi2.cdf(mahalanobis_1.squeeze() + logdet1, df=2*self.filters[0].kf.dim_x)
+
+        class_mismatch = np.zeros_like(logdet1)
+        if det_classes is not None:
+            class_mismatch[det_classes != self.det_class] = 1
         
-        return mahalanobis_1.squeeze() + logdet1, bious, proba_1
+        return mahalanobis_1.squeeze() + logdet1 + class_mismatch, bious, proba_1
 
 class KalmanTrackerBox(object):
 
