@@ -13,8 +13,8 @@ from pymoo.util.display.column import Column
 from pymoo.util.display.output import Output
 from scipy import interpolate
 from detector.detector import Detector
-from eval_mot17 import eval_AssA as eval_MOT17
-from eval_dance import eval_AssA as eval_Dance
+from eval_mot17 import eval_HOTA as eval_MOT17
+from eval_dance import eval_HOTA as eval_Dance
 from tracker.ucmc import UCMCTrack
 from util.run_ucmc import Tracklet, make_args
 from eval.interpolation import interpolate
@@ -185,7 +185,10 @@ def run_param_search(x,
         return 0
     print(f"Time cost: {time.time() - timer:.2f}s")
 
-    return eval_MOT17(wx, wy, a1, vmax, out_path, exp_name) if "MOT" in dataset else eval_Dance(wx, wy, a1, vmax, out_path, exp_name)
+    if "MOT" in dataset:
+        dataset_path = f"./data/{dataset}/train"
+        return eval_MOT17(wx, wy, a1, vmax, dataset_path, out_path, exp_name)
+    return eval_Dance(wx, wy, a1, vmax, out_path, exp_name)
 
 def run_pattern_search(seq, seq_params, det_path, cam_path, gmc_path, out_path, exp_name, dataset):
     args = make_args()
@@ -307,7 +310,7 @@ if __name__ == '__main__':
     det_path = "det_results/mot17/yolox_x_ablation"#"det_results/dance/val"#"det_results/mot17/yolox_x_ablation"
     cam_path = "cam_para/MOT17"#"cam_para/DanceTrack"#"cam_para/MOT17"
     gmc_path = "gmc/mot17"#"gmc/dance"#"gmc/mot17"
-    out_path = "dynnomixoutput_ct1ct2_per_cv_image_BoxIMM_cascaded/mot17"#"output/mot17_coast"
+    out_path = "output_gonly_per_cv_hota/mot17"#"output/mot17_coast"
     exp_name = "val"
     dataset = "MOT17"#"DanceTrack"#"MOT17"
 
@@ -340,7 +343,7 @@ if __name__ == '__main__':
     results = {}
     for seq in sequences:
         results[seq] = run_pattern_search(seq, default_params[seq], det_path, cam_path, gmc_path, out_path, exp_name, dataset)
-        out_file = open(f"dynnomix_ct1ct2_cv_image_BoxIMM_cascaded_per_param_search_results_{dataset}_{exp_name}.json", "w") 
+        out_file = open(f"gonly_per_cv_hota_per_param_search_results_{dataset}_{exp_name}.json", "w") 
         json.dump(results, out_file, indent = 6) 
         out_file.close() 
 

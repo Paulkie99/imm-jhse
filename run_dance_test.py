@@ -2,11 +2,11 @@ from util.run_ucmc import run_ucmc, make_args
 
 if __name__ == '__main__':
 
-    det_path = "det_results/dance/val"
+    det_path = "det_results/dance/test"
     cam_path = "cam_para/DanceTrack"
     gmc_path = "gmc/dance"
-    out_path = "run_output/dance"
-    exp_name = "val"
+    out_path = "test_output/dance"
+    exp_name = "test"
     dataset = "DanceTrack"
     args = make_args()
 

@@ -9,13 +9,19 @@ import configparser
 import json
 
 class Tracklet():
-    def __init__(self,frame_id,box):
+    def __init__(self,frame_id,box,conf=None,det_class=None):
         self.is_active = False
         self.boxes = dict()
+        self.confs = dict()
         self.boxes[frame_id] = box
+        if conf is not None:
+            self.confs[frame_id] = conf
+            self.det_class = det_class
 
-    def add_box(self, frame_id, box):
+    def add_box(self, frame_id, box, conf=None):
         self.boxes[frame_id] = box
+        if conf is not None:
+            self.confs[frame_id] = conf
 
     def activate(self):
         self.is_active = True
@@ -45,6 +51,8 @@ def make_args():
     parser.add_argument("--t_m", type=float, default=100)
     parser.add_argument("--t1", type=float, default=0.9)
     parser.add_argument("--t2", type=float, default=0.9)
+    parser.add_argument("--ct1", type=float, default=0.9)
+    parser.add_argument("--ct2", type=float, default=0.9)
     parser.add_argument("--b1", type=float, default=0.3)
     parser.add_argument("--window", type=int, default=5)
     parser.add_argument("--sigma_m", type=float, default=0.05)
@@ -76,6 +84,9 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
     if args.seq == 'all':
         args.seq = os.listdir(det_path)
         args.seq = [seq.split('.')[0] for seq in args.seq]
+        print(args.seq)
+        if dataset == "MOT17":
+            args.seq = [seq.split('-SDP')[0] for seq in args.seq]
     else:
         args.seq = [args.seq]
 
@@ -88,6 +99,7 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
 
         if params is not None:
             if seq in params:
+                print(params[seq])
                 args.wx = params[seq]['wx']
                 args.wy = params[seq]['wy']
                 args.a1 = params[seq]['a1']
@@ -102,7 +114,10 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
                 args.a3 = params[seq].get("a3", args.a3)
                 args.t1 = params[seq].get('t1', args.t1)
                 args.t2 = params[seq].get('t2', args.t2)
+                args.ct1 = params[seq].get('ct1', args.t1)
+                args.ct2 = params[seq].get('ct2', args.t2)
             else:
+                print(params)
                 args.wx = params['wx']
                 args.wy = params['wy']
                 args.a1 = params['a1']
@@ -117,6 +132,8 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
                 args.a3 = params.get("a3", args.a3)
                 args.t1 = params.get('t1', args.t1)
                 args.t2 = params.get('t2', args.t2)
+                args.ct1 = params.get('ct1', args.t1)
+                args.ct2 = params.get('ct2', args.t2)
 
         eval_path = os.path.join(out_path,exp_name)
         orig_save_path = os.path.join(eval_path,seq_name)
@@ -136,7 +153,7 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
         gmc_file = os.path.join(gmc_path, f"GMC-{seq_name}.txt")
 
         config = configparser.ConfigParser()
-        config.read(f"data/{dataset}/{'train' if exp_name == 'val' and dataset == 'MOT17' else exp_name}/{seq_name}{'-SDP' if 'MOT' in dataset else ''}/seqinfo.ini")
+        config.read(f"data/{dataset}/{'train' if exp_name == 'val' and dataset == 'MOT17' else exp_name}/{seq_name}{'-SDP' if 'MOT17' in dataset else ''}/seqinfo.ini")
         args.fps = float(config['Sequence']['frameRate'])
         args.frame_width = float(config['Sequence']['imWidth'])
         args.frame_height = float(config['Sequence']['imHeight'])
@@ -159,7 +176,7 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
         wy = args.wy
         vmax = args.vmax
         
-        tracker = UCMCTrack(a1, a2, wx,wy,vmax, cdt, fps, dataset, high_score,args.cmc,detector, t_m=args.t_m, b1=args.b1, t1=args.t1, t2=args.t2, a3=args.a3)
+        tracker = UCMCTrack(a1, a2, wx,wy,vmax, cdt, fps, dataset, high_score,args.cmc,detector, t_m=args.t_m, b1=args.b1, t1=args.t1, t2=args.t2, a3=args.a3, ct1=args.ct1, ct2=args.ct2)
 
         t1 = time.time()
 
@@ -247,8 +264,8 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
                             cv2.circle(frame_img, tuple(t.uv), 5, (255, 0, 0), -1)
         
                 # frame_img[:homog_resize_dim, -homog_resize_dim:] = cv2.resize(homog_img, (homog_resize_dim, homog_resize_dim))
-                if frame_id % 69 == 0:
-                    print()
+                # if frame_id % 69 == 0:
+                #     print()
                 if args.video:
                     video_out.write(frame_img)
                 # homog_out.write(homog_img)

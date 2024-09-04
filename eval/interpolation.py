@@ -3,25 +3,39 @@ import os
 import glob
 import shutil
 import sys
+from detector.detector import KittiDetector
 
 def mkdir_if_missing(d):
     if not os.path.exists(d):
         os.makedirs(d)
 
-def write_results_score(filename, results):
-    save_format = '{frame},{id},{x1},{y1},{w},{h},{s},-1,-1,-1\n'
-    with open(filename, 'w') as f:
-        for i in range(results.shape[0]):
-            frame_data = results[i]
-            frame_id = int(frame_data[0])
-            track_id = int(frame_data[1])
-            x1, y1, w, h = frame_data[2:6]
-            score = frame_data[6]
-            line = save_format.format(frame=frame_id, id=track_id, x1=x1, y1=y1, w=w, h=h, s=-1)
-            f.write(line)
+def write_results_score(filename, results, kitti):
+    if not kitti:
+        save_format = '{frame},{id},{x1},{y1},{w},{h},{s},-1,-1,-1\n'
+        with open(filename, 'w') as f:
+            for i in range(results.shape[0]):
+                frame_data = results[i]
+                frame_id = int(frame_data[0])
+                track_id = int(frame_data[1])
+                x1, y1, w, h = frame_data[2:6]
+                score = frame_data[6]
+                line = save_format.format(frame=frame_id, id=track_id, x1=x1, y1=y1, w=w, h=h, s=-1)
+                f.write(line)
+    else:
+        with open(filename, 'w') as f:
+            # frameid-1, detid, class, ignore, ignore, ignore, topx, topy, botx, boty, ignore, ignore, ignore, ignore, ignore, ignore, ignore, score
+            for i in range(results.shape[0]):
+                frame_data = results[i]
+                frame_id = int(frame_data[0]) - 1
+                track_id = int(frame_data[1])
+                class_ = KittiDetector.class_ids_to_name[int(frame_data[7])]
+                x1, y1, w, h = frame_data[2:6]
+                x2, y2 = x1 + w, y1 + h
+                score = frame_data[6]
+                f.write(f"{frame_id} {track_id} {class_} -1 -1 -1 {x1} {y1} {x2} {y2} -1 -1 -1 -1000 -1000 -1000 -10 1\n")
 
 
-def dti(txt_path, save_path, n_min=25, n_dti=20):
+def dti(txt_path, save_path, n_min=25, n_dti=20, kitti=False):
     seq_txts = sorted(glob.glob(os.path.join(txt_path, '*.txt')))
     for seq_txt in seq_txts:
         seq_name = seq_txt.split(os.sep)[-1]
@@ -36,6 +50,8 @@ def dti(txt_path, save_path, n_min=25, n_dti=20):
             tracklet_dti = tracklet
             if tracklet.shape[0] == 0:
                 continue
+            else:
+                det_class = tracklet[0, 7]
             n_frame = tracklet.shape[0]
             n_conf = np.sum(tracklet[:, 6] > 0.5)
             if n_frame > n_min:
@@ -64,7 +80,7 @@ def dti(txt_path, save_path, n_min=25, n_dti=20):
                         data_dti[n, 0] = list(frames_dti.keys())[n]
                         data_dti[n, 1] = track_id
                         data_dti[n, 2:6] = frames_dti[list(frames_dti.keys())[n]]
-                        data_dti[n, 6:] = [1, -1, -1, -1]
+                        data_dti[n, 6:] = [1, det_class, -1, -1]
                     tracklet_dti = np.vstack((tracklet, data_dti))
             if n_frame > n_min and num_dti > 0:
                 dti_results = np.vstack((dti_results, data_dti))        
@@ -74,18 +90,18 @@ def dti(txt_path, save_path, n_min=25, n_dti=20):
         seq_results = seq_results[seq_results[:, 0].argsort()]
         # write_results_score(save_path, seq_results)
         print(save_seq_txt)
-        write_results_score(save_seq_txt, seq_results)
+        write_results_score(save_seq_txt, seq_results, kitti)
         # save_dti_txt = os.path.join(save_path, "dti.txt")
         # dti_results = dti_results[1:]
         # dti_results = dti_results[dti_results[:, 0].argsort()]
         # write_results_score(save_dti_txt, dti_results)
 
 
-def interpolate(txt_path, save_path, n_min=3, n_dti=20, is_enable = True):
+def interpolate(txt_path, save_path, n_min=3, n_dti=20, is_enable = True, kitti=False):
     mkdir_if_missing(txt_path)
     mkdir_if_missing(save_path)
     if is_enable:
-        dti(txt_path, save_path, n_min, n_dti)
+        dti(txt_path, save_path, n_min, n_dti,kitti)
     else:
         #拷贝txt_path下的文件到save_path
         for file in os.listdir(txt_path):

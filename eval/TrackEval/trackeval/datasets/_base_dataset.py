@@ -93,9 +93,9 @@ class _BaseDataset(ABC):
         raw_tracker_data, min_frame, max_frame = self._load_raw_file(tracker, seq, is_gt=False)
         
         
-        if 'bdd' in self.name:
-            min_frame = min_frame_gt
-            max_frame = max_frame_gt
+        # if 'bdd' in self.name:
+        #     min_frame = min_frame_gt
+        #     max_frame = max_frame_gt
 
         # account for list indices (0 - 599) vs. frames (1 - 600)
         min_frame = min_frame - 1

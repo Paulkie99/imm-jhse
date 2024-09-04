@@ -1,4 +1,5 @@
 
+import argparse
 import sys
 import os
 from multiprocessing import freeze_support
@@ -72,6 +73,49 @@ def eval(dataset,eval_dir,seqmap,exp_name,fps_div,half_eval = False):
     output_res, output_msg = evaluator.evaluate(dataset_list, metrics_list)
     
     return output_res['summary'][0]['HOTA'], output_res['summary'][2]['IDF1'], output_res['summary'][1]['MOTA'], output_res['summary'][0]['AssA']
+
+def eval_kitti(dataset,eval_dir,seqmap,exp_name):
+    freeze_support()
+    default_eval_config = trackeval.Evaluator.get_default_eval_config()
+    default_eval_config['DISPLAY_LESS_PROGRESS'] = True
+    default_dataset_config = trackeval.datasets.Kitti2DBox.get_default_dataset_config()
+    default_metrics_config = {'METRICS': ['HOTA', 'CLEAR', 'Identity']}
+    config = {**default_eval_config, **default_dataset_config, **default_metrics_config}  # Merge default configs
+
+    eval_config = {k: v for k, v in config.items() if k in default_eval_config.keys()}
+    dataset_config = {k: v for k, v in config.items() if k in default_dataset_config.keys()}
+    metrics_config = {k: v for k, v in config.items() if k in default_metrics_config.keys()}
+
+    dataset_config['GT_FOLDER'] = dataset
+    dataset_config['TRACKERS_FOLDER'] = eval_dir
+    dataset_config['TRACKERS_TO_EVAL'] = [exp_name]
+    dataset_config['TRACKER_SUB_FOLDER'] = ''
+    dataset_config['OUTPUT_SUB_FOLDER'] = ''
+    # dataset_config['SPLIT_TO_EVAL'] = 'val'
+    # dataset_config['TRACKER_DISPLAY_NAMES'] = None
+    # dataset_config['SEQMAP_FOLDER'] = None
+    # dataset_config['SEQMAP_FILE'] = seqmap
+    # dataset_config['SEQ_INFO'] = None
+
+    # Run code
+    evaluator = trackeval.Evaluator(eval_config)
+    dataset_list = [trackeval.datasets.Kitti2DBox(dataset_config)]
+    metrics_list = []
+    for metric in [trackeval.metrics.HOTA, trackeval.metrics.CLEAR, trackeval.metrics.Identity]:
+        if metric.get_name() in metrics_config['METRICS']:
+            metrics_list.append(metric())
+    if len(metrics_list) == 0:
+        raise Exception('No metrics selected for evaluation')
+    output_res, output_msg = evaluator.evaluate(dataset_list, metrics_list)
+
+    return output_res['summary'][0]['HOTA'], output_res['summary'][2]['IDF1'], output_res['summary'][1]['MOTA'], output_res['summary'][0]['AssA']
+    
+    return (
+        output_res['Kitti2DBox']['val']['COMBINED_SEQ']['pedestrian']['HOTA']['HOTA'].mean() * 50 + output_res['Kitti2DBox']['val']['COMBINED_SEQ']['car']['HOTA']['HOTA'].mean() * 50,
+        50 * output_res['Kitti2DBox']['val']['COMBINED_SEQ']['pedestrian']['Identity']['IDF1'] + 50 * output_res['Kitti2DBox']['val']['COMBINED_SEQ']['car']['Identity']['IDF1'], 
+        50 * output_res['Kitti2DBox']['val']['COMBINED_SEQ']['pedestrian']['CLEAR']['MOTA'] + 50 * output_res['Kitti2DBox']['val']['COMBINED_SEQ']['car']['CLEAR']['MOTA'], 
+        output_res['Kitti2DBox']['val']['COMBINED_SEQ']['pedestrian']['HOTA']['AssA'].mean() * 50 + output_res['Kitti2DBox']['val']['COMBINED_SEQ']['car']['HOTA']['AssA'].mean() * 50,
+    )
 
 
 def eval_bdd(gt_folder,exp_name, eval_classes):

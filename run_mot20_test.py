@@ -2,8 +2,8 @@ from util.run_ucmc import run_ucmc, make_args
 
 if __name__ == '__main__':
 
-    det_path = "det_results/mot20"
-    cam_path = "cam_para/mot20"
+    det_path = "det_results/mot20/test"
+    cam_path = "cam_para/MOT20"
     gmc_path = "gmc/mot20"
     out_path = "output/mot20"
     exp_name = "test"

@@ -93,6 +93,7 @@ class Mapper(object):
     sigma_m = 0.05
     def __init__(self, campara_file,dataset= "kitti",process_alpha=-29,dt=1/30,sigma_m=0.05):
         self.A = np.zeros((3, 3))
+        self.dataset = dataset
         if dataset == "kitti":
             self.KiKo, self.is_ok = readKittiCalib(campara_file)
             self.z0 = -1.73
@@ -177,7 +178,8 @@ class Mapper(object):
         self.InvA = np.linalg.inv(self.A)
 
     def reset_campara(self):
-        self.KiKo = np.dot(self.Ki, self.Ko)
+        if self.dataset != 'kitti':
+            self.KiKo = np.dot(self.Ki, self.Ko)
         self.A[:, :2] = self.KiKo[:, :2]
         self.A[:, 2] = self.z0 * self.KiKo[:, 2] + self.KiKo[:, 3]
 

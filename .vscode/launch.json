@@ -5,15 +5,22 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
             "name": "Debug UCMC",
             "type": "python",
             "request": "launch",
             "program": "param_search.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
-            "justMyCode": true,
+            "justMyCode": false,
             "python": "/home/sparta-guestuser/miniconda3/envs/mamba/bin/python",
-            "args": ["--seq", "MOT17-02", "--fps", "30", "--wx", "0.1", "--wy", "0.2", "--a", "0.99", "--cdt", "30", "--hp", "--cmc", "--P", "-32"]
+            // "args": ["--seq", "MOT17-02", "--fps", "30", "--wx", "0.1", "--wy", "0.2", "--a", "0.99", "--cdt", "30", "--hp", "--cmc", "--P", "-32"]
             // "args": ["--seq", "MOT17-05", "--fps", "14", "--wx", "0.1", "--wy", "3.0", "--a", "10", "--cdt", "10", "--hp", "--cmc", "--P", "1", "--frame_width", "640", "--frame_height", "480"]
         },
         {
@@ -25,7 +32,12 @@
             "cwd": "${workspaceFolder}",
             "justMyCode": true,
             "python": "/home/sparta-guestuser/miniconda3/envs/mamba/bin/python",
-            "args": ["--cam_para", "demo/cam_para.txt", "--video", "demo/demo.mp4"]
+            "args": [
+                "--cam_para",
+                "demo/cam_para.txt",
+                "--video",
+                "demo/demo.mp4"
+            ]
         },
         {
             "name": "Debug Dance",
@@ -36,7 +48,74 @@
             "cwd": "${workspaceFolder}",
             "justMyCode": true,
             "python": "/home/sparta-guestuser/miniconda3/envs/mamba/bin/python",
-            "args": ["--seq", "dancetrack0004", "--wx", "5", "--wy", "5", "--vmax", "0.5", "--a1", "0.3", "--a2", "0.3", "--t_m", "10", "--conf_thresh", "0.5", "--high_score", "0.6", "--t1", "0.9", "--t2", "0.9", "--cdt", "30", "--P", "-32", "--video"]
+            "args": [
+                "--seq",
+                "dancetrack0019",
+                "--video",
+                "--wx",
+                "5",
+                "--wy",
+                "5",
+                "--vmax",
+                "0.5",
+                "--a1",
+                "0.9",
+                "--a2",
+                "0.9",
+                "--a3",
+                "0.5",
+                "--b1",
+                "0.3",
+                "--conf_thresh",
+                "0.25",
+                "--high_score",
+                "0.7",
+                "--t1",
+                "0.9",
+                "--t2",
+                "0.9"
+            ],
+        },
+        {
+            "name": "Debug MOT",
+            "type": "python",
+            "request": "launch",
+            "program": "run_mot17_val.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "justMyCode": true,
+            "python": "/home/sparta-guestuser/miniconda3/envs/mamba/bin/python",
+            "args": [
+                "--seq",
+                "MOT17-02",
+                "--wx",
+                "0.1",
+                "--wy",
+                "0.2",
+                "--vmax",
+                "0.5",
+                "--a1",
+                "0.99",
+                "--a2",
+                "0.5",
+                "--a3",
+                "0.9",
+                "--t_m",
+                "10",
+                "--conf_thresh",
+                "0.25",
+                "--high_score",
+                "0.7",
+                "--t1",
+                "0.9",
+                "--t2",
+                "0.1",
+                "--cdt",
+                "30",
+                "--P",
+                "-29",
+                "--video"
+            ]
         },
         {
             "name": "Debug Dance Overall",

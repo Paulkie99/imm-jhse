@@ -110,7 +110,7 @@ class UCMCTrack(object):
                 trk_idx = trackidx[j]
                 _, relative_ious[:,j], relative_ps[:,j] = self.trackers[trk_idx].distance(det_ys, det_covs, self.b1, det_classes)
                 # cost_matrix[:, j] = _
-                cbar = np.dot(self.trackers[trk_idx].boxlikelihood, self.trackers[trk_idx].boxM)
+                # cbar = np.dot(self.trackers[trk_idx].boxlikelihood, self.trackers[trk_idx].boxM)
                 cost_matrix[:, j] = 1 - relative_ps[:, j] * relative_ious[:, j] * self.track_position_bias[trk_idx] * det_confs
                 # cost_matrix[:, j] = 1 - (relative_ious[:, j] * relative_ps[:, j]) * self.track_position_bias[trk_idx] * det_confs
             
@@ -157,6 +157,8 @@ class UCMCTrack(object):
                 _, relative_ious[:, j], relative_ps[:, j] = self.trackers[trk_idx].distance(det_ys, det_covs, self.b1, det_classes)
                 cbar = self.trackers[trk_idx].boxcbar
                 cost_matrix[:, j] = 1 - (cbar[0] * relative_ious[:, j] + cbar[1] * relative_ps[:, j]) * self.track_position_bias[trk_idx] * det_confs
+                # cost_matrix[:, j] = 1 - relative_ps[:, j] * relative_ious[:, j] * self.track_position_bias[trk_idx] * det_confs
+
                 # cbar = np.dot(self.trackers[trk_idx].boxlikelihood, self.trackers[trk_idx].boxM)
                 # cost_matrix[:, j] = 1 - cbar[0] * relative_ious[:, j] * self.track_position_bias[trk_idx] * det_confs
                 # cost_matrix[:, j] = _
@@ -211,6 +213,7 @@ class UCMCTrack(object):
                 _, relative_ious[:, j], relative_ps[:,j] = self.trackers[trk_idx].distance(det_ys, det_covs, self.b1, det_classes)
                 cbar = self.trackers[trk_idx].boxcbar
                 cost_matrix[:, j] = 1 - (cbar[0] * relative_ious[:, j] + cbar[1] * relative_ps[:, j]) * self.track_position_bias[trk_idx] * det_confs
+                # cost_matrix[:, j] = 1 - relative_ps[:, j] * relative_ious[:, j] * self.track_position_bias[trk_idx] * det_confs
                 # cbar = np.dot(self.trackers[trk_idx].boxlikelihood, self.trackers[trk_idx].boxM)
                 # cost_matrix[:, j] = 1 - cbar[1] * relative_ps[:, j] * self.track_position_bias[trk_idx]
                 # cost_matrix[:, j] = _
