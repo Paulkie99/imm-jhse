@@ -10,6 +10,7 @@ DanceTrack example:
 ![](dance_example.gif)
 
 Please cite our article if you use this repo for further research:
+```json
 @misc{claasen2024interactingmultiplemodelbasedjoint,
       title={Interacting Multiple Model-based Joint Homography Matrix and Multiple Object State Estimation}, 
       author={Paul Johannes Claasen and Johan Pieter de Villiers},
@@ -19,3 +20,4 @@ Please cite our article if you use this repo for further research:
       primaryClass={cs.CV},
       url={https://arxiv.org/abs/2409.02562}, 
 }
+```
