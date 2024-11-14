@@ -5,3 +5,5 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2312.08952-<COLOR>.svg)](https://arxiv.org/abs/2409.02562)
 
 This repo was adapted from [UCMCTrack](https://github.com/corfyi/UCMCTrack). It is still under construction!
+
+![](dance_example.gif)
