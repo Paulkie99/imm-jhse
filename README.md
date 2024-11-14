@@ -8,3 +8,14 @@ This repo was adapted from [UCMCTrack](https://github.com/corfyi/UCMCTrack). It 
 
 DanceTrack example:
 ![](dance_example.gif)
+
+Please cite our article if you use this repo for further research:
+@misc{claasen2024interactingmultiplemodelbasedjoint,
+      title={Interacting Multiple Model-based Joint Homography Matrix and Multiple Object State Estimation}, 
+      author={Paul Johannes Claasen and Johan Pieter de Villiers},
+      year={2024},
+      eprint={2409.02562},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2409.02562}, 
+}
