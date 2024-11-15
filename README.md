@@ -11,8 +11,8 @@ DanceTrack example:
 
 Please cite our article if you use this repo for further research:
 ```json
-@misc{claasen2024interactingmultiplemodelbasedjoint,
-      title={Interacting Multiple Model-based Joint Homography Matrix and Multiple Object State Estimation}, 
+@misc{claasen2024homographyneedimmbasedjoint,
+      title={One Homography is All You Need: IMM-based Joint Homography and Multiple Object State Estimation}, 
       author={Paul Johannes Claasen and Johan Pieter de Villiers},
       year={2024},
       eprint={2409.02562},
