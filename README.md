@@ -66,8 +66,8 @@ To create a new conda environment with the required dependencies, follow these s
 
 ## Test results
 
-The result files used to obtain the results reported in the paper are given in the `result_files` folder.
-Submit these to the evaluation servers for the various datasets.
+The result files used to obtain the results reported in the paper for the test sets are given in the `result_files` folder.
+Submit these to the evaluation servers for the various test datasets.
 
 ## Citation
 
