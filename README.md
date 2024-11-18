@@ -12,6 +12,58 @@ This repo was adapted from [UCMCTrack](https://github.com/corfyi/UCMCTrack). It 
 DanceTrack example:
 ![](dance_example.gif)
 
+## Setting Up the Conda Environment
+
+To create a new conda environment with the required dependencies, follow these steps:
+
+1. Ensure you have [Anaconda](https://www.anaconda.com/products/distribution) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html) installed on your system.
+
+2. Open a terminal or command prompt.
+
+3. Navigate to the directory containing the `environment.yml` file.
+
+4. Run the following command to create a new conda environment:
+
+    ```sh
+    conda env create -f environment.yml
+    ```
+
+5. Activate the newly created environment:
+
+    ```sh
+    conda activate <environment_name>
+    ```
+
+    Replace `<environment_name>` with the name specified in the `environment.yml` file.
+
+## Run IMM-JHSE on the DanceTrack test set
+
+1. Download the [DanceTrack testing and validation sets](https://huggingface.co/datasets/noahcao/dancetrack/tree/main).
+
+2. Extract the contents to maintain the following folder structure:
+      ~~~
+      {IMM-JHSE ROOT}
+      |-- data
+            |-- DanceTrack
+            |   |-- val
+            |   |   |-- dancetrack0004
+            |   |   |   |-- img1
+            |   |   |   |   |-- 00000001.jpg
+            |   |   |   |   |-- ...
+            |   |   |   |-- gt
+            |   |   |   |   |-- gt.txt            
+            |   |   |   |-- seqinfo.ini
+            |   |   |-- ...
+            |   |-- test
+            |   |   |-- ...
+      ~~~
+
+3.  Run the following to get results with video in the test_output/dance/test folder:
+    ```sh
+    run_dance_test.py --seq all --param_file dancetrack_params.json --video
+    ```
+    You can omit the --video flag to perform inference without video output.
+
 Please cite our article if you use this repo for further research:
 ```json
 @misc{claasen2024homographyneedimmbasedjoint,
