@@ -64,6 +64,10 @@ To create a new conda environment with the required dependencies, follow these s
     ```
     You can omit the --video flag to perform inference without video output.
 
+## Test results
+
+The result files used to obtain the results reported in the paper are given in the `result_files` folder.
+
 ## Citation
 
 Please cite our article if you use this repo for further research:
