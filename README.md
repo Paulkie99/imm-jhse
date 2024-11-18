@@ -64,6 +64,8 @@ To create a new conda environment with the required dependencies, follow these s
     ```
     You can omit the --video flag to perform inference without video output.
 
+## Citation
+
 Please cite our article if you use this repo for further research:
 ```json
 @misc{claasen2024homographyneedimmbasedjoint,
