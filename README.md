@@ -58,7 +58,7 @@ To create a new conda environment with the required dependencies, follow these s
             |   |   |-- ...
       ~~~
 
-3.  Run the following to get results with video in the test_output/dance/test folder:
+3.  Run the following to get results with video in the `test_output/dance/test` folder:
     ```sh
     run_dance_test.py --seq all --param_file dancetrack_params.json --video
     ```
