@@ -109,7 +109,6 @@ class Mapper(object):
 
         self.covariance = np.eye(8) * 0#1e-12
 
-        # self.process_covariance = np.eye(8) * 10.0 ** process_alpha #* 1e-3 * ((dt / (1/14))**2) 
         self.process_covariance = np.load("pnoise/dancetrack0007.npy")
 
         self.sigma_m = sigma_m

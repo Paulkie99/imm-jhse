@@ -6,7 +6,7 @@ from lap import lapjv
 import scipy
 
 
-from .kalman import CVHIMM, KalmanTrackerBox,TrackStatus
+from .kalman import CVHIMM, TrackStatus
 
 
 def linear_assignment(cost_matrix, thresh):
@@ -109,16 +109,10 @@ class UCMCTrack(object):
             for j in range(num_trk):
                 trk_idx = trackidx[j]
                 _, relative_ious[:,j], relative_ps[:,j] = self.trackers[trk_idx].distance(det_ys, det_covs, self.b1, det_classes)
-                # cost_matrix[:, j] = _
-                # cbar = np.dot(self.trackers[trk_idx].boxlikelihood, self.trackers[trk_idx].boxM)
-                cost_matrix[:, j] = 1 - relative_ps[:, j] * relative_ious[:, j] * self.track_position_bias[trk_idx] * det_confs
-                # cost_matrix[:, j] = 1 - (relative_ious[:, j] * relative_ps[:, j]) * self.track_position_bias[trk_idx] * det_confs
+                cost_matrix[:, j] = 1 - relative_ps[:, j] * relative_ious[:, j] * det_confs
             
             matched_indices,unmatched_a,unmatched_b = linear_assignment(cost_matrix, self.a1)
 
-            # relative_ious = relative_ious / relative_ious.sum(axis=1)[:, None]
-            # relative_ps = relative_ps / relative_ps.sum(axis=1)[:, None]
-            
             for i in unmatched_a:
                 detidx_remain.append(detidx_high[i])
             for i in unmatched_b:
@@ -131,7 +125,6 @@ class UCMCTrack(object):
                                               relative_ps[i,j])
                 self.trackers[trk_idx].death_count = 0
                 self.trackers[trk_idx].detidx = det_idx
-                # self.trackers[trk_idx].R = dets[det_idx].R
                 self.trackers[trk_idx].status = TrackStatus.Confirmed
                 dets[det_idx].track_id = self.trackers[trk_idx].id
 
@@ -157,16 +150,8 @@ class UCMCTrack(object):
                 _, relative_ious[:, j], relative_ps[:, j] = self.trackers[trk_idx].distance(det_ys, det_covs, self.b1, det_classes)
                 cbar = self.trackers[trk_idx].boxcbar
                 cost_matrix[:, j] = 1 - (cbar[0] * relative_ious[:, j] + cbar[1] * relative_ps[:, j]) * self.track_position_bias[trk_idx] * det_confs
-                # cost_matrix[:, j] = 1 - relative_ps[:, j] * relative_ious[:, j] * self.track_position_bias[trk_idx] * det_confs
-
-                # cbar = np.dot(self.trackers[trk_idx].boxlikelihood, self.trackers[trk_idx].boxM)
-                # cost_matrix[:, j] = 1 - cbar[0] * relative_ious[:, j] * self.track_position_bias[trk_idx] * det_confs
-                # cost_matrix[:, j] = _
 
             matched_indices,unmatched_a,unmatched_b = linear_assignment(cost_matrix,self.a2)
-
-            # relative_ious = relative_ious / relative_ious.sum(axis=1)[:, None]
-            # relative_ps = relative_ps / relative_ps.sum(axis=1)[:, None]
 
             for i in unmatched_a:
                 if dets[detidx_low[i]].conf >= self.high_score:
@@ -175,7 +160,6 @@ class UCMCTrack(object):
             for i in unmatched_b:
                 trk_idx = trackidx_remain[i]
                 self.trackers[trk_idx].status = TrackStatus.Coasted
-                # self.trackers[trk_idx].death_count += 1
                 self.trackers[trk_idx].detidx = -1
 
             for i,j in matched_indices:
@@ -186,7 +170,6 @@ class UCMCTrack(object):
                       
                 self.trackers[trk_idx].death_count = 0
                 self.trackers[trk_idx].detidx = det_idx
-                # self.trackers[trk_idx].R = dets[det_idx].R
                 self.trackers[trk_idx].status = TrackStatus.Confirmed
                 dets[det_idx].track_id = self.trackers[trk_idx].id
         else:
@@ -213,15 +196,8 @@ class UCMCTrack(object):
                 _, relative_ious[:, j], relative_ps[:,j] = self.trackers[trk_idx].distance(det_ys, det_covs, self.b1, det_classes)
                 cbar = self.trackers[trk_idx].boxcbar
                 cost_matrix[:, j] = 1 - (cbar[0] * relative_ious[:, j] + cbar[1] * relative_ps[:, j]) * self.track_position_bias[trk_idx] * det_confs
-                # cost_matrix[:, j] = 1 - relative_ps[:, j] * relative_ious[:, j] * self.track_position_bias[trk_idx] * det_confs
-                # cbar = np.dot(self.trackers[trk_idx].boxlikelihood, self.trackers[trk_idx].boxM)
-                # cost_matrix[:, j] = 1 - cbar[1] * relative_ps[:, j] * self.track_position_bias[trk_idx]
-                # cost_matrix[:, j] = _
 
         matched_indices,unmatched_a,unmatched_b = linear_assignment(cost_matrix,self.a3)
-
-        # relative_ious = relative_ious / relative_ious.sum(axis=1)[:, None]
-        # relative_ps = relative_ps / relative_ps.sum(axis=1)[:, None]
 
         for i,j in matched_indices:
             det_idx = self.detidx_remain[i]
@@ -231,7 +207,6 @@ class UCMCTrack(object):
             self.trackers[trk_idx].death_count = 0
             self.trackers[trk_idx].birth_count += 1
             self.trackers[trk_idx].detidx = det_idx
-            # self.trackers[trk_idx].R = dets[det_idx].R
             dets[det_idx].track_id = self.trackers[trk_idx].id
             if self.trackers[trk_idx].birth_count >= 2:
                 self.trackers[trk_idx].birth_count = 0
@@ -247,59 +222,13 @@ class UCMCTrack(object):
         for i in unmatched_a:
             unmatched_detidx.append(self.detidx_remain[i])
 
-        # num_det = len(unmatched_detidx)
-        # num_trk = len(unmatched_trks)
-        # if num_det * num_trk > 0:
-        #     cost_matrix = np.zeros((num_det, num_trk))
-        #     relative_ious = np.zeros((num_det, num_trk))
-        #     relative_ps = np.zeros((num_det, num_trk))
-        #     det_ys = [dets[det_idx].y for det_idx in unmatched_detidx]
-        #     det_covs = [dets[det_idx].R for det_idx in unmatched_detidx]
-        #     det_confs = np.array([dets[det_idx].conf for det_idx in unmatched_detidx])
-        #     if len(det_ys):
-        #         for j in range(num_trk):
-        #             trk_idx = unmatched_trks[j]
-        #             _, relative_ious[:, j], relative_ps[:,j] = self.trackers[trk_idx].distance(det_ys, det_covs, self.b1)
-        #             # cbar = np.dot(self.trackers[trk_idx].likelihood, self.trackers[trk_idx].M)
-        #             cost_matrix[:, j] = 1 - self.trackers[trk_idx].cbar[1] * relative_ious[:, j] #* det_confs
-                
-        #     matched_indices,unmatched_a,unmatched_b = linear_assignment(cost_matrix,self.a2)
-
-        #     for i,j in matched_indices:
-        #         det_idx = unmatched_detidx[i]
-        #         trk_idx = unmatched_trks[j]
-        #         self.trackers[trk_idx].update(dets[det_idx].y, dets[det_idx].R, relative_ious[i,j],
-        #                             relative_ps[i,j])
-        #         self.trackers[trk_idx].death_count = 0
-        #         self.trackers[trk_idx].birth_count += 1
-        #         self.trackers[trk_idx].detidx = det_idx
-        #         # self.trackers[trk_idx].R = dets[det_idx].R
-        #         dets[det_idx].track_id = self.trackers[trk_idx].id
-        #         if self.trackers[trk_idx].birth_count >= 2:
-        #             self.trackers[trk_idx].birth_count = 0
-        #             self.trackers[trk_idx].status = TrackStatus.Confirmed
-
-        #     for i in unmatched_b:
-        #         trk_idx = unmatched_trks[i]
-        #         # self.trackers[trk_idx].death_count += 1
-        #         self.trackers[trk_idx].detidx = -1
-
-        #     temp_unmatched_detidx = []
-        #     for i in unmatched_a:
-        #         temp_unmatched_detidx.append(unmatched_detidx[i])
-        #     unmatched_detidx = temp_unmatched_detidx
-
         self.detidx_remain = unmatched_detidx
 
     def initial_tentative(self,dets,H,H_P,H_Q):
         for i in self.detidx_remain: 
-            # self.trackers.append(SingerKalmanTracker(dets[i],self.wx,self.wy,self.vmax,self.dt,H,H_P,H_Q, self.t_m, self.t1, self.t2, self.window_len))
             self.trackers.append(CVHIMM(dets[i],self.wx,self.wy,self.vmax,self.dt,H,H_P,H_Q, window=self.window_len, t1=self.t1, t2=self.t2, ct1=self.ct1, ct2=self.ct2))
-            # self.trackers.append(KalmanTrackerBox(dets[i],self.wx,self.wy,self.vmax,self.dt,H,H_P,H_Q, window=self.window_len, t1=self.t1, t2=self.t2))
-            # self.trackers.append(OGKalmanTracker(dets[i].y[:2, :2], dets[i].R[:2, :2],self.wx,self.wy,self.vmax,dets[i].bb_width, dets[i].bb_height,self.dt))
             self.trackers[-1].status = TrackStatus.Tentative
             self.trackers[-1].detidx = i
-            # self.trackers[-1].R = dets[i].R
         self.detidx_remain = []
 
     def delete_old_trackers(self):

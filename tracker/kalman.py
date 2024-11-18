@@ -594,9 +594,6 @@ class KalmanTrackerStatic(object):
             self.innov_list.get()
         self.innov_list.put(kalman_gain @ diff[:2] @ diff[:2].T @ kalman_gain.T)
         self.H_Q = np.mean(self.innov_list.queue, axis=0)[-8:, -8:] + np.eye(8) * 1e-32
-        # if np.linalg.det(self.H_Q) > np.linalg.det(self.H_Q_orig):
-            # self.H_Q = self.H_Q_orig
-            # self.H_Q = self.H_Q * np.linalg.det(self.H_Q_orig) / np.linalg.det(self.H_Q)
 
     def predict(self, affine):  
         self.kf.x = self.x
@@ -724,8 +721,6 @@ class KalmanTrackerDynamic(KalmanTrackerStatic):
             self.R = scipy.linalg.block_diag(dX_dU @ self.R[:2, :2] @ dX_dU.T, self.R)
             self.R[:2, :2] += np.eye(2) * 1e-12
             self.R[2:4, 2:4] += np.eye(2)
-            # if np.linalg.det(self.R[2:4, 2:4]) > np.linalg.det(R[2:4, 2:4]):
-            #     self.R = R
 
             S_0 = np.dot(jacobian[:2], np.dot(self.kf.P,jacobian[:2].T)) + self.R[2:4, 2:4]
             SI_0 = np.linalg.inv(S_0)
@@ -746,8 +741,6 @@ class KalmanTrackerDynamic(KalmanTrackerStatic):
             self.innov_list.get()
         self.innov_list.put(kalman_gain @ diff[:2] @ diff[:2].T @ kalman_gain.T)
         self.H_Q = np.mean(self.innov_list.queue, axis=0)[-8:, -8:] + self.H_Q_orig
-        # if np.linalg.det(self.H_Q) > np.linalg.det(100 * self.H_Q_orig):
-        #     self.H_Q = self.H_Q * np.linalg.det(100 * self.H_Q_orig) / np.linalg.det(self.H_Q)
 
 class CVHIMM(IMMEstimator):
     count = 1
