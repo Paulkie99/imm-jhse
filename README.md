@@ -60,7 +60,7 @@ To create a new conda environment with the required dependencies, follow these s
 
 3.  Run the following to get results with video in the `test_output/dance/test` folder:
     ```sh
-    run_dance_test.py --seq all --param_file dancetrack_params.json --video
+    python run_dance_test.py --seq all --param_file dancetrack_params.json --video
     ```
     You can omit the --video flag to perform inference without video output.
 
