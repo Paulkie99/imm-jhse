@@ -3,8 +3,6 @@ from __future__ import print_function
 
 import numpy as np
 from lap import lapjv
-import scipy
-
 
 from .kalman import CVHIMM, TrackStatus
 
@@ -86,7 +84,6 @@ class UCMCTrack(object):
                 detidx_high.append(i)
             else:
                 detidx_low.append(i)
-        # detidx_high = list(np.arange(len(dets)))
         trackidx_remain = []
         self.detidx_remain = []
         detidx_remain = []

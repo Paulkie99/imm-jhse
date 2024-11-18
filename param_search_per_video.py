@@ -112,14 +112,7 @@ def run_param_search(x,
 
     a1 = a1
     a2 = a2
-    # high_score = args.high_score
     fps = args.fps
-    # vmax = args.vmax
-    # cdt = args.cdt
-    # conf_thresh = args.conf_thresh
-    # t_m = args.t_m
-    # t1 = args.t1
-    # t2 = args.t2 
     window = args.window
 
     tracker = UCMCTrack(a1, a2, wx,wy,vmax, cdt, fps, dataset, high_score,args.cmc,detector, args.t_m, b1=b1, t1=t1, t2=t2, window_len=window, a3=a3, alpha=0, ct1=ct1, ct2=ct2)
@@ -228,21 +221,6 @@ def run_pattern_search(seq, seq_params, det_path, cam_path, gmc_path, out_path, 
     ]
     n_var = 14
 
-    # vars
-    # "wx": 5,
-    # "wy": 5,
-    # "a1": 0.4,
-    # "a2": 0.75,
-    # "vmax": 0.5,
-    # "conf_thresh": 0.25,
-    # "high_score": 0.7,
-    # "cdt": 100,
-    # "P": -29,
-    # "b1": 0.3,
-    # "t1": 0.9,
-    # "t2": 0.9,
-    # "a3": 0.5
-    # "t_m": 2
     problem = FunctionalProblem(
         n_var,
         obj,
@@ -252,8 +230,6 @@ def run_pattern_search(seq, seq_params, det_path, cam_path, gmc_path, out_path, 
 
     algorithm = PatternSearch(x0=np.array([args.wx, args.wy, args.a1, args.a2, args.vmax, args.conf_thresh, args.high_score, args.cdt, args.b1, args.a3, args.t1, args.t2, args.t1, args.t2]),
                               init_delta=0.75)
-    # algorithm = PatternSearch(n_sample_points=10,
-    #                         init_delta=0.75)
 
     class MyOutput(Output):
 
@@ -272,19 +248,7 @@ def run_pattern_search(seq, seq_params, det_path, cam_path, gmc_path, out_path, 
                    get_termination("n_eval", 200),
                    output=MyOutput(),
                    verbose=True, seed=1)
-    # "wx": 5,
-    # "wy": 5,
-    # "a1": 0.4,
-    # "a2": 0.75,
-    # "vmax": 0.5,
-    # "conf_thresh": 0.25,
-    # "high_score": 0.7,
-    # "cdt": 100,
-    # "P": -29,
-    # "b1": 0.3,
-    # "t_m": 2,
-    # "t1": 0.9,
-    # "t2": 0.9,
+
     return {
         "wx": res.X[0],
         "wy": res.X[1], 
@@ -294,15 +258,12 @@ def run_pattern_search(seq, seq_params, det_path, cam_path, gmc_path, out_path, 
         "conf_thresh": res.X[5],
         "high_score": res.X[6],
         "cdt": res.X[7],
-        # "P": res.X[8],
         "b1": res.X[8],
-        # "alpha": res.X[11],
         "a3": res.X[9],
         "t1": res.X[10],
         "t2": res.X[11],
         "ct1": res.X[12],
         "ct2": res.X[13],
-        # "t_m": res.X[13],
         "OBJ": res.F[0]
     }
 
@@ -317,7 +278,6 @@ if __name__ == '__main__':
     sequences = ["MOT17-02", "MOT17-04", "MOT17-05", "MOT17-09", "MOT17-10", "MOT17-11", "MOT17-13"]
     # sequences = os.listdir(det_path)
     # sequences = [seq.split('.')[0] for seq in sequences]
-    # sequences = ["dancetrack0026"]
 
     default_params = {
         seq: {
@@ -343,7 +303,7 @@ if __name__ == '__main__':
     results = {}
     for seq in sequences:
         results[seq] = run_pattern_search(seq, default_params[seq], det_path, cam_path, gmc_path, out_path, exp_name, dataset)
-        out_file = open(f"gonly_per_cv_hota_per_param_search_results_{dataset}_{exp_name}.json", "w") 
+        out_file = open(f"gonly_hota_per_param_search_results_{dataset}_{exp_name}.json", "w") 
         json.dump(results, out_file, indent = 6) 
         out_file.close() 
 

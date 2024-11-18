@@ -105,10 +105,6 @@ class Detector:
         dets = self.dets[frame_id]
         dets = [det for det in dets if det.det_class == det_class and det.conf >= conf_thresh]
 
-        # for det in dets:
-        #     det.y,det.R = self.mapper.get_UV_and_error(det.get_box())
-        #     y, R = self.mapper.uv2xy(det.y, det.R)
-        #     det.y, det.R = np.r_[y, det.y, [[det.bb_width]]], scipy.linalg.block_diag(R, det.R)
         return dets
 
     def cmc(self,x,y,w,h,frame_id):
@@ -203,8 +199,4 @@ class KittiDetector(Detector):
         dets = self.dets[frame_id]
         dets = [det for det in dets if det.conf >= conf_thresh and det.det_class in det_class]
 
-        # for det in dets:
-        #     det.y,det.R = self.mapper.get_UV_and_error(det.get_box())
-        #     y, R = self.mapper.uv2xy(det.y, det.R)
-        #     det.y, det.R = np.r_[y, det.y, [[det.bb_width]]], scipy.linalg.block_diag(R, det.R)
         return dets

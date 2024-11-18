@@ -115,11 +115,7 @@ def run_param_search(x, sequences,
 
         a1 = a1
         a2 = a2
-        # high_score = args.high_score
         fps = args.fps
-        # vmax = args.vmax
-        # cdt = args.cdt
-        # conf_thresh = args.conf_thresh
         window = args.window
 
         tracker = UCMCTrack(a1, a2, wx,wy,vmax, cdt, fps, dataset, high_score,args.cmc,detector, args.t_m, b1=b1, t1=t1, t2=t2, window_len=window, a3=a3, alpha=0, ct1=ct1, ct2=ct2)
@@ -224,21 +220,6 @@ def run_pattern_search(sequences, seq_params, det_path, cam_path, gmc_path, out_
     ]
     n_var = 14
 
-    # vars
-    # "wx": 5,
-    # "wy": 5,
-    # "a1": 0.4,
-    # "a2": 0.75,
-    # "vmax": 0.5,
-    # "conf_thresh": 0.25,
-    # "high_score": 0.7,
-    # "cdt": 100,
-    # "P": -29,
-    # "b1": 0.3,
-    # "t1": 0.9,
-    # "t2": 0.9,
-    # "a3": 0.5
-    # "t_m": 2,
     problem = FunctionalProblem(
         n_var,
         obj,
@@ -275,15 +256,12 @@ def run_pattern_search(sequences, seq_params, det_path, cam_path, gmc_path, out_
         "conf_thresh": res.X[5],
         "high_score": res.X[6],
         "cdt": res.X[7],
-        # "P": res.X[8],
         "b1": res.X[8],
-        # "alpha": res.X[11],
         "a3": res.X[9],
         "t1": res.X[10],
         "t2": res.X[11],
         "ct1": res.X[12],
         "ct2": res.X[13],
-        # "t_m": res.X[13],
         "OBJ": res.F[0]
     }
 
@@ -291,7 +269,7 @@ if __name__ == '__main__':
     det_path = "det_results/dance/val"#"det_results/mot17/yolox_x_ablation"
     cam_path = "cam_para/DanceTrack"#"cam_para/MOT17"
     gmc_path = "gmc/dance"#"gmc/mot17"
-    out_path = "output_overall_cv_hota_gonly/dance"#"output_overall_hota_gonly/mot17"
+    out_path = "output_overall_hota_gonly/dance"#"output_overall_hota_gonly/mot17"
     exp_name = "val"
     dataset = "DanceTrack"#
 
@@ -321,6 +299,6 @@ if __name__ == '__main__':
     results = run_pattern_search(sequences, default_params, det_path, cam_path, gmc_path, out_path, exp_name, dataset)
 
     print(results)
-    out_file = open(f"cv_overall_hota_gonly_param_search_results_{dataset}_{exp_name}.json", "w")   
+    out_file = open(f"overall_hota_gonly_param_search_results_{dataset}_{exp_name}.json", "w")   
     json.dump(results, out_file, indent = 6) 
     out_file.close() 

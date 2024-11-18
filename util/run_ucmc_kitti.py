@@ -1,5 +1,5 @@
 import numpy as np
-from detector.detector import Detector
+from detector.detector import Detector, KittiDetector
 from tracker.ucmc import UCMCTrack
 from eval.interpolation import interpolate
 import os,time
@@ -152,17 +152,16 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
 
         gmc_file = os.path.join(gmc_path, f"GMC-{seq_name}.txt")
 
-        config = configparser.ConfigParser()
-        config.read(f"data/{dataset}/{'train' if exp_name == 'val' and dataset == 'MOT17' else exp_name}/{seq_name}{'-SDP' if 'MOT17' in dataset else ''}/seqinfo.ini")
-        args.fps = float(config['Sequence']['frameRate'])
-        args.frame_width = float(config['Sequence']['imWidth'])
-        args.frame_height = float(config['Sequence']['imHeight'])
+        args.fps = 10
+        sample_img = cv2.imread(f"data/{dataset}/data_tracking_image_2/testing/image_02/{seq}/{str(0).zfill(6)}.png")
+        args.frame_width = sample_img.shape[1]
+        args.frame_height = sample_img.shape[0]
         args.hp = True
 
         print(det_file)
         print(cam_para)
 
-        detector = Detector(args.add_cam_noise, 1/args.fps)
+        detector = KittiDetector(args.add_cam_noise, 1/args.fps)
         detector.load(cam_para, det_file,gmc_file,args.P,sigma_m=args.sigma_m)
         print(f"seq_length = {detector.seq_length}")
 
@@ -183,14 +182,15 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
         tracklets = dict()
 
         if args.video:
+            print(f'{orig_save_path}/{seq_name}.mp4')
             video_out = cv2.VideoWriter(f'{orig_save_path}/{seq_name}.mp4', cv2.VideoWriter_fourcc(*'mp4v'), fps, (int(args.frame_width), int(args.frame_height)))
 
         with open(result_file,"w") as f:
             for frame_id in range(1, detector.seq_length + 1):
                 if args.video:
-                    frame_img = cv2.imread(f"data/{dataset}/{'train' if exp_name == 'val' and dataset == 'MOT17' else exp_name}/{seq_name}{'-SDP' if 'MOT' in dataset else ''}/img1/{str(frame_id).zfill(6 if 'MOT' in dataset else 8)}.jpg")
+                    frame_img = cv2.imread(f"data/{dataset}/data_tracking_image_2/testing/image_02/{seq}/{str(frame_id-1).zfill(6)}.png")
                 frame_affine = detector.gmc.get_affine(frame_id)
-                dets = detector.get_dets(frame_id, conf_thresh, 1 if "oracle" in det_path else 0)
+                dets = detector.get_dets(frame_id, conf_thresh)
                 tracker.update(dets,frame_affine)
                 if args.hp:
                     for i in tracker.tentative_idx:
@@ -245,7 +245,7 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
                             angle = np.rad2deg(np.arccos(t.eigenvectors[0, 0]))
                             cv2.ellipse(frame_img, tuple(t.uv), (major_axis, minor_axis), angle, 0, 360, (255, 255, 255), 2)
 
-                            cv2.putText(frame_img, str(round(tracker.track_position_bias[i], 2)), (int(dets[t.detidx].bb_left+dets[t.detidx].bb_width), int(dets[t.detidx].bb_top+dets[t.detidx].bb_height)), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                            # cv2.putText(frame_img, str(round(tracker.track_position_bias[i], 2)), (int(dets[t.detidx].bb_left+dets[t.detidx].bb_width), int(dets[t.detidx].bb_top+dets[t.detidx].bb_height)), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
                 else:
                     for i in tracker.confirmed_idx:
@@ -262,7 +262,7 @@ def run_ucmc(args, det_path = "det_results/mot17/yolox_x_ablation",
                             cv2.putText(frame_img, str(np.round(t.g_mahala, 2)), (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top) + 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
                             cv2.putText(frame_img, str(t.id), (int(dets[t.detidx].bb_left), int(dets[t.detidx].bb_top)), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
                             cv2.circle(frame_img, tuple(t.uv), 5, (255, 0, 0), -1)
-
+        
                 if args.video:
                     video_out.write(frame_img)
             if args.hp:

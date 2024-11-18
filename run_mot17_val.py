@@ -5,7 +5,7 @@ if __name__ == '__main__':
     det_path = "det_results/mot17/yolox_x_ablation"
     cam_path = "cam_para/MOT17"
     gmc_path = "gmc/mot17"
-    out_path = "output/mot17"
+    out_path = "val_output/mot17"
     exp_name = "val"
     dataset = "MOT17"
     args = make_args()

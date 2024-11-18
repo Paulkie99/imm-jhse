@@ -106,11 +106,7 @@ def run_param_search(x, sequences,
 
         a1 = a1
         a2 = a2
-        # high_score = args.high_score
         fps = args.fps
-        # vmax = args.vmax
-        # cdt = args.cdt
-        # conf_thresh = args.conf_thresh
         window = args.window
 
         tracker = UCMCTrack(a1, a2, wx,wy,vmax, cdt, fps, dataset, high_score,args.cmc,detector, args.t_m, b1=b1, t1=t1, t2=t2, window_len=window, a3=a3, alpha=0, ct1=ct1, ct2=ct2)
@@ -123,15 +119,7 @@ def run_param_search(x, sequences,
             for frame_id in range(1, detector.seq_length + 1):
                 frame_affine = detector.gmc.get_affine(frame_id)
                 dets = detector.get_dets(frame_id, conf_thresh, [0,1,2,3,4])
-                frametime = time.time()
-                # try:
                 tracker.update(dets,frame_affine)
-                # except Exception as e:
-                #     print(e)
-                #     return 0
-                # if time.time() - frametime >= 1:
-                #     print("Aborting optimistation iteration")
-                #     return 0
                 if args.hp:
                     for i in tracker.tentative_idx:
                         t = tracker.trackers[i]
@@ -162,20 +150,10 @@ def run_param_search(x, sequences,
                 for frame_id in range(1, detector.seq_length + 1):
                     for id in tracklets:
                         if tracklets[id].is_active:
-                            det_class = tracklets[id].det_class
                             if frame_id in tracklets[id].boxes:
-                                # class_ = Detector.class_ids_to_name[det_class]
-                                # x1, y1, w, h = tracklets[id].boxes[frame_id]
-                                # x2, y2 = x1 + w, y1 + h
-                                # f.write(f"{frame_id - 1} {id} {class_} -1 -1 -1 {x1} {y1} {x2} {y2} -1 -1 -1 -1000 -1000 -1000 -10 1\n")
                                 box = tracklets[id].boxes[frame_id]
                                 f.write(f"{frame_id},{id},{box[0]:.1f},{box[1]:.1f},{box[2]:.1f},{box[3]:.1f},-1,{tracklets[id].det_class},-1,-1\n")
-        # try:
-        # interpolate(orig_save_path, eval_path, n_min=0, n_dti=1, is_enable = False, kitti=True)
         interpolate(orig_save_path, eval_path, n_min=3, n_dti=cdt, is_enable = True, kitti=True)
-        # except Exception as e:
-            # print(e)
-            # return 0
         print(f"Time cost: {time.time() - timer:.2f}s")
 
     return eval(wx, wy, a1, vmax, out_path, exp_name)
@@ -221,21 +199,6 @@ def run_pattern_search(sequences, seq_params, det_path, cam_path, gmc_path, out_
     ]
     n_var = 14
 
-    # vars
-    # "wx": 5,
-    # "wy": 5,
-    # "a1": 0.4,
-    # "a2": 0.75,
-    # "vmax": 0.5,
-    # "conf_thresh": 0.25,
-    # "high_score": 0.7,
-    # "cdt": 100,
-    # "P": -29,
-    # "b1": 0.3,
-    # "t1": 0.9,
-    # "t2": 0.9,
-    # "a3": 0.5
-    # "t_m": 2,
     problem = FunctionalProblem(
         n_var,
         obj,
@@ -272,29 +235,24 @@ def run_pattern_search(sequences, seq_params, det_path, cam_path, gmc_path, out_
         "conf_thresh": res.X[5],
         "high_score": res.X[6],
         "cdt": res.X[7],
-        # "P": res.X[8],
         "b1": res.X[8],
-        # "alpha": res.X[11],
         "a3": res.X[9],
         "t1": res.X[10],
         "t2": res.X[11],
         "ct1": res.X[12],
         "ct2": res.X[13],
-        # "t_m": res.X[13],
         "OBJ": res.F[0]
     }
 
 if __name__ == '__main__':
-    det_path = "det_results/permatrack_kitti_test"#"det_results/mot20"#"det_results/mot17/yolox_x_ablation"#
-    cam_path = "cam_para/Kitti/testing/calib"#"cam_para/MOT20"#"cam_para/MOT17"#
-    gmc_path = "gmc/kitti/test"#"gmc/mot20"#"gmc/mot17"#
-    out_path = "output_overall_cv_hota_test/kitti"#"output_overall_hota/mot20"#
+    # We run this file for one iteration with the parameters obtained on the KITTI training set. This is just a quick and dirty way of getting results files.
+    det_path = "det_results/permatrack_kitti_test"
+    cam_path = "cam_para/Kitti/testing/calib"
+    gmc_path = "gmc/kitti/test"
+    out_path = "output_overall_hota_test/kitti"
     exp_name = "test"
-    dataset = "Kitti"#"MOT20"#"MOT17"#
+    dataset = "Kitti"
 
-    # sequences = ["MOT17-02", "MOT17-04", "MOT17-05", "MOT17-09", "MOT17-10", "MOT17-11", "MOT17-13"]
-    # sequences = ["MOT20-05", "MOT20-03", "MOT20-02", "MOT20-01"]
-    # sequences = ["0002", "0006", "0007", "0008", "0010", "0013", "0014", "0016", "0018"]
     sequences = os.listdir(det_path)
     sequences = sorted([seq.split('.')[0] for seq in sequences])
 

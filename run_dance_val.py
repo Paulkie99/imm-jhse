@@ -5,7 +5,7 @@ if __name__ == '__main__':
     det_path = "det_results/dance/val"
     cam_path = "cam_para/DanceTrack"
     gmc_path = "gmc/dance"
-    out_path = "run_output/dance"
+    out_path = "val_output/dance"
     exp_name = "val"
     dataset = "DanceTrack"
     args = make_args()

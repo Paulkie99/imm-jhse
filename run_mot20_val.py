@@ -5,7 +5,7 @@ if __name__ == '__main__':
     det_path = "det_results/mot20/val"
     cam_path = "cam_para/MOT20"
     gmc_path = "gmc/mot20"
-    out_path = "output/mot20"
+    out_path = "val_output/mot20"
     exp_name = "val"
     dataset = "MOT20"
     args = make_args()
