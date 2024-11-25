@@ -1,6 +1,6 @@
 # One Homography is All You Need: IMM-JHSE
 
-> **[Information Fusion 2024] One Homography is All You Need: IMM-based Joint Homography and Multiple Object State Estimation**.
+> **[Preprint Information Fusion 2024] One Homography is All You Need: IMM-based Joint Homography and Multiple Object State Estimation**.
 
 [![arXiv](https://img.shields.io/badge/arXiv-2409.02562-<COLOR>.svg)](https://arxiv.org/abs/2409.02562)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/interacting-multiple-model-based-joint/multiple-object-tracking-on-kitti-test-online)](https://paperswithcode.com/sota/multiple-object-tracking-on-kitti-test-online?p=interacting-multiple-model-based-joint)
